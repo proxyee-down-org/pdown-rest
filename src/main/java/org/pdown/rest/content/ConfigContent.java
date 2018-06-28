@@ -3,10 +3,10 @@ package org.pdown.rest.content;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.pdown.rest.DownRestServer;
 import org.pdown.rest.base.content.PersistenceContent;
-import org.pdown.rest.entity.ConfigInfo;
+import org.pdown.rest.entity.ServerConfigInfo;
 import java.io.File;
 
-public class ConfigContent extends PersistenceContent<ConfigInfo, ConfigContent> {
+public class ConfigContent extends PersistenceContent<ServerConfigInfo, ConfigContent> {
 
   private static final ConfigContent INSTANCE = new ConfigContent();
 
@@ -16,7 +16,7 @@ public class ConfigContent extends PersistenceContent<ConfigInfo, ConfigContent>
 
   @Override
   protected TypeReference type() {
-    return new TypeReference<ConfigInfo>() {
+    return new TypeReference<ServerConfigInfo>() {
     };
   }
 
@@ -26,7 +26,7 @@ public class ConfigContent extends PersistenceContent<ConfigInfo, ConfigContent>
   }
 
   @Override
-  protected ConfigInfo defaultValue() {
-    return new ConfigInfo();
+  protected ServerConfigInfo defaultValue() {
+    return new ServerConfigInfo();
   }
 }

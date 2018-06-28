@@ -1,6 +1,7 @@
 package org.pdown.rest.base;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.pdown.rest.base.exception.NotFoundException;
 import org.pdown.rest.base.exception.ParameterException;
 import org.pdown.rest.entity.HttpResult;
 import javax.servlet.http.HttpServletResponse;
@@ -20,21 +21,24 @@ public class GlobalErrorExceptionAdvice {
   @ExceptionHandler(ParameterException.class)
   @ResponseBody
   public ResponseEntity<HttpResult> handleBad(HttpServletResponse response, Exception e) {
-    response.setHeader("Content-Type", "application/json;charset=utf-8");
     return ResponseEntity.badRequest().body(new HttpResult().msg("parameters error:" + e.getMessage()));
   }
 
   @ExceptionHandler(JsonProcessingException.class)
   @ResponseBody
   public ResponseEntity<HttpResult> handleJsonParseError(HttpServletResponse response, Exception e) {
-    response.setHeader("Content-Type", "application/json;charset=utf-8");
     return ResponseEntity.badRequest().body(new HttpResult().msg("parameters error"));
+  }
+
+  @ExceptionHandler(NotFoundException.class)
+  @ResponseBody
+  public ResponseEntity<HttpResult> handleNotFoundError(HttpServletResponse response, Exception e) {
+    return ResponseEntity.notFound().build();
   }
 
   @ExceptionHandler(Exception.class)
   @ResponseBody
   public ResponseEntity<HttpResult> handleError(HttpServletResponse response, Exception e) {
-    response.setHeader("Content-Type", "application/json;charset=utf-8");
     LOGGER.error("request error:", e);
     return new ResponseEntity<>(new HttpResult().msg("server error"), HttpStatus.INTERNAL_SERVER_ERROR);
   }

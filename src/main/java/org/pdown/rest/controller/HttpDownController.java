@@ -2,6 +2,7 @@ package org.pdown.rest.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.util.internal.StringUtil;
 import org.pdown.rest.base.exception.NotFoundException;
 import org.pdown.rest.base.exception.ParameterException;
 import org.pdown.rest.content.ConfigContent;
@@ -34,7 +35,7 @@ public class HttpDownController {
   /*
   Resolve request
    */
-  @PostMapping("resolve")
+  @PostMapping("api/resolve")
   public ResponseEntity<HttpResult> resolve(HttpServletRequest request) throws Exception {
     NioEventLoopGroup loopGroup = null;
     try {
@@ -57,55 +58,70 @@ public class HttpDownController {
   /*
   Create a download task, join the download queue after requesting parsing task related information.
    */
-  @PostMapping("create")
+  @PostMapping("tasks")
   public ResponseEntity<HttpResult> create(HttpServletRequest request) throws Exception {
     ObjectMapper mapper = new ObjectMapper();
     CreateTaskForm createTaskForm = mapper.readValue(request.getInputStream(), CreateTaskForm.class);
-    commonCheck(createTaskForm);
-    String taskId = commonCreate(HttpDownBootstrap.builder(createTaskForm.getRequest().getUrl(), createTaskForm.getRequest().getHeads(), createTaskForm.getRequest().getBody())
-        .response(createTaskForm.getResponse())
-        .downConfig(createTaskForm.getConfig()));
-    return ResponseEntity.ok().body(new HttpResult().data(taskId));
+    if (createTaskForm.getRequest() == null) {
+      throw new ParameterException("request can' be empty");
+    }
+    if (StringUtils.isEmpty(createTaskForm.getRequest().getUrl())) {
+      throw new ParameterException("url can'content be empty");
+    }
+    HttpDownBootstrapBuilder bootstrapBuilder;
+    //if know response Content-Length and file name,can create a task directly, without spending a request to resolve the task name and size.
+    if (createTaskForm.getResponse() != null
+        && createTaskForm.getResponse().getTotalSize() > 0
+        && !StringUtil.isNullOrEmpty(createTaskForm.getResponse().getFileName())) {
+      HttpRequestInfo httpRequestInfo = HttpDownUtil.buildGetRequest(createTaskForm.getRequest().getUrl(), createTaskForm.getRequest().getHeads(), createTaskForm.getRequest().getBody());
+      bootstrapBuilder = HttpDownBootstrap.builder().request(httpRequestInfo);
+    } else {
+      bootstrapBuilder = HttpDownBootstrap.builder(createTaskForm.getRequest().getUrl(), createTaskForm.getRequest().getHeads(), createTaskForm.getRequest().getBody());
+    }
+    HttpDownBootstrap httpDownBootstrap = bootstrapBuilder.response(createTaskForm.getResponse())
+        .downConfig(createTaskForm.getConfig())
+        .callback(new PersistenceHttpDownCallback())
+        .proxyConfig(ConfigContent.getInstance().get().getProxyConfig())
+        .build();
+    HttpDownContent downContent = HttpDownContent.getInstance();
+    String id = UUID.randomUUID().toString();
+    synchronized (downContent) {
+      long runningCount = downContent.get().values().stream()
+          .filter(bootstrap -> bootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
+          .count();
+      if (runningCount < ConfigContent.getInstance().get().getTaskLimit()) {
+        httpDownBootstrap.start();
+      }
+    }
+    downContent.put(id, httpDownBootstrap).save();
+    return ResponseEntity.ok().body(new HttpResult().data(id));
   }
 
-  /*
-  Create a download task, if know response Content-Length and file name,can create a task directly, without spending a request to resolve the task name and size.
-   */
-  @PostMapping("createDirect")
-  public ResponseEntity<HttpResult> createDirect(HttpServletRequest request) throws Exception {
-    ObjectMapper mapper = new ObjectMapper();
-    CreateTaskForm createTaskForm = mapper.readValue(request.getInputStream(), CreateTaskForm.class);
-    commonCheck(createTaskForm);
-    HttpRequestInfo httpRequestInfo = HttpDownUtil.buildGetRequest(createTaskForm.getRequest().getUrl(), createTaskForm.getRequest().getHeads(), createTaskForm.getRequest().getBody());
-    String taskId = commonCreate(HttpDownBootstrap.builder()
-        .request(httpRequestInfo)
-        .response(createTaskForm.getResponse())
-        .downConfig(createTaskForm.getConfig()));
-    return ResponseEntity.ok().body(new HttpResult().data(taskId));
-  }
-
-  @PutMapping("pause/{id}")
+  @PutMapping("tasks/{id}/pause")
   public ResponseEntity<HttpResult> pauseDown(@PathVariable String id) {
     HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
     if (bootstrap == null) {
       throw new NotFoundException("task does not exist");
     }
-    HttpDownContent.getInstance().get(id).pauseDown();
-    return ResponseEntity.ok().body(new HttpResult().msg("OK"));
+    HttpDownContent.getInstance().get(id).pause();
+    return ResponseEntity.ok().body(new HttpResult().msg("success"));
   }
 
-  @PutMapping("continue/{id}")
-  public ResponseEntity<HttpResult> continueDown(@PathVariable String id) {
+  @PutMapping("tasks/{id}/resume")
+  public ResponseEntity<HttpResult> resume(@PathVariable String id) {
     HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
     if (bootstrap == null) {
       throw new NotFoundException("task does not exist");
     }
-    HttpDownContent.getInstance().get(id).continueDown();
-    return ResponseEntity.ok().body(new HttpResult().msg("OK"));
+    HttpDownContent.getInstance()
+        .get(id)
+        .setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
+        .resume();
+    return ResponseEntity.ok().body(new HttpResult().msg("success"));
   }
 
 
-  @GetMapping("list")
+  @GetMapping("tasks")
   public ResponseEntity<HttpResult> list() {
     List<TaskForm> list = HttpDownContent.getInstance().get()
         .entrySet()
@@ -122,7 +138,21 @@ public class HttpDownController {
     return ResponseEntity.ok().body(new HttpResult().data(list));
   }
 
-  @GetMapping("progress")
+  @GetMapping("tasks/{id}")
+  public ResponseEntity<HttpResult> detail(@PathVariable String id) {
+    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
+    if (bootstrap == null) {
+      throw new NotFoundException("task does not exist");
+    }
+    TaskForm taskForm = new TaskForm();
+    taskForm.setId(id);
+    taskForm.setRequest(HttpRequestForm.parse(bootstrap.getRequest()));
+    taskForm.setConfig(bootstrap.getDownConfig());
+    taskForm.setInfo(bootstrap.getTaskInfo());
+    return ResponseEntity.ok().body(new HttpResult().data(taskForm));
+  }
+
+  @GetMapping("tasks/progress")
   public ResponseEntity<HttpResult> progress() {
     List<TaskForm> list = HttpDownContent.getInstance().get()
         .entrySet()
@@ -136,34 +166,5 @@ public class HttpDownController {
         })
         .collect(Collectors.toList());
     return ResponseEntity.ok().body(new HttpResult().data(list));
-  }
-
-  private void commonCheck(CreateTaskForm createTaskForm) {
-    if (createTaskForm.getRequest() == null) {
-      throw new ParameterException("request can' be empty");
-    }
-    if (StringUtils.isEmpty(createTaskForm.getRequest().getUrl())) {
-      throw new ParameterException("url can'content be empty");
-    }
-  }
-
-  private String commonCreate(HttpDownBootstrapBuilder builder) {
-    ConfigContent configContent = ConfigContent.getInstance();
-    HttpDownContent downContent = HttpDownContent.getInstance();
-    HttpDownBootstrap httpDownBootstrap = builder.proxyConfig(configContent.get().getProxyConfig())
-        .callback(new ContentHttpDownCallback())
-        .proxyConfig(ConfigContent.getInstance().get().getProxyConfig())
-        .build();
-    String id = UUID.randomUUID().toString();
-    synchronized (downContent) {
-      long runningCount = downContent.get().values().stream()
-          .filter(bootstrap -> bootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
-          .count();
-      if (runningCount < ConfigContent.getInstance().get().getTaskLimit()) {
-        httpDownBootstrap.startDown();
-      }
-    }
-    downContent.put(id, httpDownBootstrap).save();
-    return id;
   }
 }

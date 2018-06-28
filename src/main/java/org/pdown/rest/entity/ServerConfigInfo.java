@@ -4,11 +4,11 @@ import java.io.Serializable;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.proxy.ProxyConfig;
 
-public class ConfigInfo extends HttpDownConfigInfo implements Serializable {
+public class ServerConfigInfo extends HttpDownConfigInfo implements Serializable {
 
   private static final long serialVersionUID = 8851967460594279184L;
   /**
-   * rest server port
+   * rest org.pdown.rest.test.server port
    */
   private long port;
   /**

@@ -1,6 +1,8 @@
+package org.pdown.rest.test;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -13,11 +15,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.pdown.core.constant.HttpDownStatus;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpResponseInfo;
 import org.pdown.core.entity.TaskInfo;
@@ -29,6 +33,7 @@ import org.pdown.rest.entity.HttpResult;
 import org.pdown.rest.form.CreateTaskForm;
 import org.pdown.rest.form.HttpRequestForm;
 import org.pdown.rest.form.TaskForm;
+import org.pdown.rest.test.server.RangeDownTestServer;
 import org.pdown.rest.util.ContentUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -38,7 +43,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import server.RangeDownTestServer;
 
 
 @RunWith(SpringRunner.class)
@@ -46,7 +50,7 @@ import server.RangeDownTestServer;
 @AutoConfigureMockMvc
 public class HttpDownControllerTest {
 
-  private static final String TEST_DIR = System.getProperty("user.dir") + "/target";
+  private static final String TEST_DIR = System.getProperty("user.dir") + "/target/test";
   private static final String TEST_BUILD_FILE = TEST_DIR + "/build.data";
   private static final String DOWN_FILE_NAME = "测试.data";
   private static final String DOWN_FILE = TEST_DIR + "/" + DOWN_FILE_NAME;
@@ -58,10 +62,11 @@ public class HttpDownControllerTest {
 
   @Before
   public void init() throws Exception {
-    delRecords();
+    FileUtil.createDirSmart(TEST_DIR);
+    //delRecords();
     //build random file
     buildRandomFile(TEST_BUILD_FILE, 1024 * 1024 * 500L);
-    //start test http server
+    //start test http org.pdown.rest.test.server
     port = OsUtil.getFreePort(8866);
     new RangeDownTestServer(TEST_BUILD_FILE).start(port);
     DownRestServer.init(null);
@@ -82,13 +87,12 @@ public class HttpDownControllerTest {
     ObjectMapper objectMapper = ContentUtil.getObjectMapper();
     HttpRequestForm httpRequestForm = new HttpRequestForm();
     httpRequestForm.setUrl("http://127.0.0.1:" + port);
-    mockMvc.perform(post("/resolve").contentType(MediaType.APPLICATION_JSON_UTF8)
+    mockMvc.perform(post("/api/resolve").contentType(MediaType.APPLICATION_JSON_UTF8)
         .content(objectMapper.writeValueAsString(httpRequestForm)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.fileName").exists())
         .andExpect(jsonPath("$.data.totalSize").exists())
-        .andExpect(jsonPath("$.data.supportRange").value(true))
-        .andDo(print());
+        .andExpect(jsonPath("$.data.supportRange").value(true));
   }
 
   @Test
@@ -96,32 +100,79 @@ public class HttpDownControllerTest {
     ObjectMapper objectMapper = ContentUtil.getObjectMapper();
     CreateTaskForm createTaskForm = new CreateTaskForm();
     createTaskForm.setRequest(new HttpRequestForm("http://127.0.0.1:" + port, null, null));
-    createTaskForm.setConfig(new HttpDownConfigInfo().setFilePath(TEST_DIR));
+    createTaskForm.setConfig(new HttpDownConfigInfo().setFilePath(TEST_DIR).setConnections(2));
     createTaskForm.setResponse(new HttpResponseInfo(DOWN_FILE_NAME));
-    mockMvc.perform(post("/create")
+    MvcResult result = mockMvc.perform(post("/tasks")
 //        .contentType(MediaType.APPLICATION_JSON_UTF8)
         .content(objectMapper.writeValueAsString(createTaskForm)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").exists())
-        .andDo(print());
-    TypeReference type = new TypeReference<HttpResult<List<TaskForm>>>() {
-    };
-    while (true) {
-      MvcResult mvcResult = mockMvc.perform(get("/progress"))
-          .andExpect(status().isOk())
-          .andExpect(jsonPath("$.data").isArray())
-          .andReturn();
-      HttpResult<List<TaskForm>> httpResult = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), type);
-      List<TaskForm> list = httpResult.getData();
-      if (list == null || list.size() == 0) {
-        break;
+        .andReturn();
+    HttpResult httpResult = objectMapper.readValue(result.getResponse().getContentAsString(), HttpResult.class);
+    String taskId = httpResult.getData().toString();
+    CountDownLatch countDownLatch = new CountDownLatch(1);
+    new Thread(() -> {
+      TypeReference progressType = new TypeReference<HttpResult<List<TaskForm>>>() {
+      };
+      while (true) {
+        try {
+          MvcResult mvcResult = mockMvc.perform(get("/tasks/progress"))
+              .andExpect(status().isOk())
+              .andExpect(jsonPath("$.data").isArray())
+              .andReturn();
+          HttpResult<List<TaskForm>> httpResultArray = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), progressType);
+          List<TaskForm> list = httpResultArray.getData();
+          if (list == null || list.size() == 0) {
+            MvcResult taskResult = mockMvc.perform(get("/tasks/" + taskId)).andReturn();
+            if (taskResult.getResponse().getStatus() == 200) {
+              TypeReference taskType = new TypeReference<HttpResult<TaskForm>>() {
+              };
+              HttpResult<TaskForm> taskResultForm = objectMapper.readValue(taskResult.getResponse().getContentAsString(), taskType);
+              TaskForm taskForm = taskResultForm.getData();
+              if (taskForm.getInfo().getStatus() == HttpDownStatus.DONE) {
+                break;
+              }
+            }
+          } else {
+            TaskInfo taskInfo = list.get(0).getInfo();
+            System.out.println("speed:" + ByteUtil.byteFormat(taskInfo.getSpeed()) + "/S");
+          }
+          Thread.sleep(1000);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
       }
-      TaskInfo taskInfo = list.get(0).getInfo();
-      System.out.println("speed:" + ByteUtil.byteFormat(taskInfo.getSpeed()) + "/S");
-      Thread.sleep(1000);
-    }
+      countDownLatch.countDown();
+    }).start();
+    Thread.sleep(233);
+    mockMvc.perform(put("/tasks/" + taskId + "/pause"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.msg").value("success"));
+    //Pause for 3 seconds
+    Thread.sleep(3000);
+    mockMvc.perform(put("/tasks/" + taskId + "/resume"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.msg").value("success"));
+
+    countDownLatch.await();
     //Compare MD5
     Assert.assertEquals(getMd5ByFile(new File(TEST_BUILD_FILE)), getMd5ByFile(new File(DOWN_FILE)));
+  }
+
+  @Test
+  public void serverShutdown() throws Exception {
+    ObjectMapper objectMapper = ContentUtil.getObjectMapper();
+    CreateTaskForm createTaskForm = new CreateTaskForm();
+    createTaskForm.setRequest(new HttpRequestForm("http://127.0.0.1:" + port, null, null));
+    createTaskForm.setConfig(new HttpDownConfigInfo().setFilePath(TEST_DIR).setConnections(2));
+    createTaskForm.setResponse(new HttpResponseInfo(DOWN_FILE_NAME));
+    mockMvc.perform(post("/tasks")
+        .content(objectMapper.writeValueAsString(createTaskForm)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data").exists())
+        .andReturn();
+    Thread.sleep(2333);
+    System.exit(1);
   }
 
   public static void buildRandomFile(String path, long size) throws IOException {

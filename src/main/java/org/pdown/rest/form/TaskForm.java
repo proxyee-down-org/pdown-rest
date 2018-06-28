@@ -1,12 +1,14 @@
 package org.pdown.rest.form;
 
 import org.pdown.core.entity.HttpDownConfigInfo;
+import org.pdown.core.entity.HttpResponseInfo;
 import org.pdown.core.entity.TaskInfo;
 
 public class TaskForm {
 
   private String id;
   private HttpRequestForm request;
+  private HttpResponseInfo response;
   private HttpDownConfigInfo config;
   private TaskInfo info;
 
@@ -24,6 +26,14 @@ public class TaskForm {
 
   public void setRequest(HttpRequestForm request) {
     this.request = request;
+  }
+
+  public HttpResponseInfo getResponse() {
+    return response;
+  }
+
+  public void setResponse(HttpResponseInfo response) {
+    this.response = response;
   }
 
   public HttpDownConfigInfo getConfig() {

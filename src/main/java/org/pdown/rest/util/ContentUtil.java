@@ -47,6 +47,19 @@ public class ContentUtil {
     }
   }
 
+  public static <T> T get(String path, Class<T> clazz) throws IOException {
+    String bakPath = buildBakPath(path);
+    if (!FileUtil.existsAny(path, bakPath)) {
+      return null;
+    }
+    ObjectMapper objectMapper = getObjectMapper();
+    try {
+      return objectMapper.readValue(new FileInputStream(path), clazz);
+    } catch (Exception e) {
+      return objectMapper.readValue(new FileInputStream(bakPath), clazz);
+    }
+  }
+
   private static String buildBakPath(String path) {
     File saveFile = new File(path);
     StringBuilder sb = new StringBuilder(saveFile.getParent() + File.separator);

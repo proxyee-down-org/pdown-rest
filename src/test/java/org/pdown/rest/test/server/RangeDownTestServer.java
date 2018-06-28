@@ -1,4 +1,4 @@
-package server;
+package org.pdown.rest.test.server;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -132,7 +132,7 @@ public class RangeDownTestServer {
                       if (!(e instanceof IOException)) {
                         e.printStackTrace();
                       }
-                      System.out.println("test server channel close");
+                      System.out.println("test org.pdown.rest.test.server channel close");
                     } finally {
                       ReferenceCountUtil.release(msg);
                     }

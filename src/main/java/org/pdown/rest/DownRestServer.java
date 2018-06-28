@@ -22,10 +22,6 @@ public class DownRestServer {
     String rootPath = System.getProperty("user.dir");
     //设置slf4j日志打印目录
     System.setProperty("LOG_PATH", rootPath);
-    //netty设置为堆内存分配
-    System.setProperty("io.netty.noPreferDirect", "true");
-    //不使用内存池
-    System.setProperty("io.netty.allocator.numHeapArenas", "0");
     if (baseDir == null) {
       baseDir = rootPath;
     }
@@ -34,7 +30,7 @@ public class DownRestServer {
       dir.mkdir();
     }
     DownRestServer.baseDir = dir.getPath();
-    //server config
+    //org.pdown.rest.test.server config
     ConfigContent.getInstance().load();
     //download content
     HttpDownContent.getInstance().load();
@@ -48,7 +44,7 @@ public class DownRestServer {
   public static void main(String[] args) {
     Options options = new Options();
     options.addOption("h", "help", false, "See the help.");
-    options.addOption("b", "baseDir", false, "The basic path of the server operation");
+    options.addOption("b", "baseDir", false, "The basic path of the org.pdown.rest.test.server operation");
     String tips = "pdServer [-b/--baseDir][-h/--help]";
     HelpFormatter formatter = new HelpFormatter();
     CommandLineParser parser = new DefaultParser();
