@@ -3,6 +3,7 @@ package org.pdown.rest.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.internal.StringUtil;
+import java.util.Map.Entry;
 import org.pdown.rest.base.exception.NotFoundException;
 import org.pdown.rest.base.exception.ParameterException;
 import org.pdown.rest.content.ConfigContent;
@@ -107,6 +108,18 @@ public class HttpDownController {
     return ResponseEntity.ok().body(new HttpResult().msg("success"));
   }
 
+  @PutMapping("tasks/pause")
+  public ResponseEntity<HttpResult> pauseAll() {
+    HttpDownContent.getInstance()
+        .get()
+        .values()
+        .stream()
+        .filter(httpDownBootstrap -> httpDownBootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
+        .forEach(httpDownBootstrap -> httpDownBootstrap.setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
+            .pause());
+    return ResponseEntity.ok().body(new HttpResult().msg("success"));
+  }
+
   @PutMapping("tasks/{id}/resume")
   public ResponseEntity<HttpResult> resume(@PathVariable String id) {
     HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
@@ -118,6 +131,22 @@ public class HttpDownController {
         .setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
         .resume();
     return ResponseEntity.ok().body(new HttpResult().msg("success"));
+  }
+
+  @PutMapping("tasks/resume")
+  public ResponseEntity<HttpResult> resumeAll() {
+    List<Entry<String, HttpDownBootstrap>> list = HttpDownContent.getInstance()
+        .get()
+        .entrySet()
+        .stream()
+        .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.PAUSE)
+        .collect(Collectors.toList());
+    list.forEach(entry -> entry.getValue().setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
+        .resume());
+    List<String> ids = list.stream()
+        .map(entry -> entry.getKey())
+        .collect(Collectors.toList());
+    return ResponseEntity.ok().body(new HttpResult().data(ids).msg("success"));
   }
 
 

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.pdown.core.constant.HttpDownStatus;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpRequestInfo;
 import org.pdown.core.entity.HttpResponseInfo;
@@ -76,6 +77,9 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
           try {
             taskInfo = ContentUtil.get(progressSavePath(taskForm.getConfig(), taskForm.getResponse()), TaskInfo.class);
           } catch (Exception e) {
+          }
+          if (taskInfo != null && taskInfo.getStatus() != HttpDownStatus.DONE) {
+            taskInfo.setStatus(HttpDownStatus.PAUSE);
           }
           HttpDownBootstrap httpDownBootstrap = HttpDownBootstrap.builder()
               .request(request)
