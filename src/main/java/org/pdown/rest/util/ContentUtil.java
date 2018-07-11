@@ -75,7 +75,7 @@ public class ContentUtil {
   }
 
   public static ObjectMapper getObjectMapper() {
-    return getObjectMapper();
+    return getObjectMapper(null);
   }
 
   public static ObjectMapper getObjectMapper(String... ignoreFields) {

@@ -10,10 +10,10 @@ public class RestUtil {
   }
 
   public static ResponseEntity<HttpResult> buildResponse(Object data) {
-    return buildResponse(null, data);
+    return buildResponse("success", data);
   }
 
   public static ResponseEntity<HttpResult> buildResponse() {
-    return buildResponse("success", null);
+    return buildResponse(null);
   }
 }

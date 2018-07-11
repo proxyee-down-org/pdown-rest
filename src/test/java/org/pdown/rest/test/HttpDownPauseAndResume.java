@@ -41,7 +41,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @RunWith(SpringRunner.class)
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, classes = DownRestServer.class)
 @AutoConfigureMockMvc
-public class TestHttpDownResume {
+public class HttpDownPauseAndResume {
 
   private static final String TEST_DIR = System.getProperty("user.dir") + "/target/test";
   private static final String TEST_BUILD_FILE = TEST_DIR + "/build.data";
