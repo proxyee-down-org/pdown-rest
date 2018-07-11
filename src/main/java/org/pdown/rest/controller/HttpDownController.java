@@ -3,25 +3,32 @@ package org.pdown.rest.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.internal.StringUtil;
-import java.util.Map.Entry;
-import org.pdown.rest.base.exception.NotFoundException;
-import org.pdown.rest.base.exception.ParameterException;
-import org.pdown.rest.content.ConfigContent;
-import org.pdown.rest.content.HttpDownContent;
-import org.pdown.rest.entity.HttpResult;
-import org.pdown.rest.form.CreateTaskForm;
-import org.pdown.rest.form.HttpRequestForm;
-import org.pdown.rest.form.TaskForm;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import org.pdown.core.boot.HttpDownBootstrap;
 import org.pdown.core.boot.HttpDownBootstrapBuilder;
 import org.pdown.core.constant.HttpDownStatus;
+import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpRequestInfo;
 import org.pdown.core.entity.HttpResponseInfo;
 import org.pdown.core.util.HttpDownUtil;
+import org.pdown.rest.base.exception.NotFoundException;
+import org.pdown.rest.base.exception.ParameterException;
+import org.pdown.rest.content.ConfigContent;
+import org.pdown.rest.content.HttpDownContent;
+import org.pdown.rest.entity.HttpResult;
+import org.pdown.rest.entity.ServerConfigInfo;
+import org.pdown.rest.form.CreateTaskForm;
+import org.pdown.rest.form.HttpRequestForm;
+import org.pdown.rest.form.TaskForm;
+import org.pdown.rest.util.RestUtil;
+import org.pdown.rest.vo.ResumeVo;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,30 +39,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class HttpDownController {
-
-  /*
-  Resolve request
-   */
-  @PostMapping("api/resolve")
-  public ResponseEntity<HttpResult> resolve(HttpServletRequest request) throws Exception {
-    NioEventLoopGroup loopGroup = null;
-    try {
-      ObjectMapper mapper = new ObjectMapper();
-      HttpRequestForm requestForm = mapper.readValue(request.getInputStream(), HttpRequestForm.class);
-      if (StringUtils.isEmpty(requestForm.getUrl())) {
-        throw new ParameterException("url can't be empty");
-      }
-      HttpRequestInfo httpRequestInfo = HttpDownUtil.buildGetRequest(requestForm.getUrl(), requestForm.getHeads(), requestForm.getBody());
-      loopGroup = new NioEventLoopGroup(1);
-      HttpResponseInfo httpResponseInfo = HttpDownUtil.getHttpResponseInfo(httpRequestInfo, null, null, loopGroup);
-      return ResponseEntity.ok().body(new HttpResult().data(httpResponseInfo));
-    } finally {
-      if (loopGroup != null) {
-        loopGroup.shutdownGracefully();
-      }
-    }
-  }
-
   /*
   Create a download task, join the download queue after requesting parsing task related information.
    */
@@ -80,7 +63,7 @@ public class HttpDownController {
       bootstrapBuilder = HttpDownBootstrap.builder(createTaskForm.getRequest().getUrl(), createTaskForm.getRequest().getHeads(), createTaskForm.getRequest().getBody());
     }
     HttpDownBootstrap httpDownBootstrap = bootstrapBuilder.response(createTaskForm.getResponse())
-        .downConfig(createTaskForm.getConfig())
+        .downConfig(buildConfig(createTaskForm.getConfig()))
         .callback(new PersistenceHttpDownCallback())
         .proxyConfig(ConfigContent.getInstance().get().getProxyConfig())
         .build();
@@ -95,7 +78,7 @@ public class HttpDownController {
       }
     }
     downContent.put(id, httpDownBootstrap).save();
-    return ResponseEntity.ok().body(new HttpResult().data(id));
+    return RestUtil.buildResponse(id);
   }
 
   @PutMapping("tasks/{id}/pause")
@@ -105,7 +88,7 @@ public class HttpDownController {
       throw new NotFoundException("task does not exist");
     }
     HttpDownContent.getInstance().get(id).pause();
-    return ResponseEntity.ok().body(new HttpResult().msg("success"));
+    return RestUtil.buildResponse();
   }
 
   @PutMapping("tasks/pause")
@@ -117,44 +100,59 @@ public class HttpDownController {
         .filter(httpDownBootstrap -> httpDownBootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
         .forEach(httpDownBootstrap -> httpDownBootstrap.setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
             .pause());
-    return ResponseEntity.ok().body(new HttpResult().msg("success"));
+    return RestUtil.buildResponse();
   }
 
   @PutMapping("tasks/{id}/resume")
   public ResponseEntity<HttpResult> resume(@PathVariable String id) {
+    ResumeVo resumeVo = new ResumeVo();
     HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
     if (bootstrap == null) {
       throw new NotFoundException("task does not exist");
     }
-    HttpDownContent.getInstance()
-        .get(id)
-        .setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
-        .resume();
-    return ResponseEntity.ok().body(new HttpResult().msg("success"));
+    resumeVo.setResumeIds(Arrays.asList(new String[]{id}));
+    if (HttpDownContent.getInstance().get(id).getTaskInfo().getStatus() == HttpDownStatus.PAUSE) {
+      resumeVo.setPauseIds(handleResume(1));
+      HttpDownContent.getInstance().get(id)
+          .setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
+          .resume();
+    }
+    return RestUtil.buildResponse(resumeVo);
   }
 
   @PutMapping("tasks/resume")
   public ResponseEntity<HttpResult> resumeAll() {
-    List<Entry<String, HttpDownBootstrap>> list = HttpDownContent.getInstance()
-        .get()
+    ResumeVo resumeVo = new ResumeVo();
+    resumeVo.setPauseIds(handleResume(0));
+    int runCount = (int) HttpDownContent.getInstance().get()
         .entrySet()
         .stream()
-        .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.PAUSE)
-        .collect(Collectors.toList());
-    list.forEach(entry -> entry.getValue().setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
-        .resume());
-    List<String> ids = list.stream()
-        .map(entry -> entry.getKey())
-        .collect(Collectors.toList());
-    return ResponseEntity.ok().body(new HttpResult().data(ids).msg("success"));
+        .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
+        .count();
+    int needResumeCount = ConfigContent.getInstance().get().getTaskLimit() - runCount;
+    if (needResumeCount > 0) {
+      List<String> resumeIds = new ArrayList<>();
+      HttpDownContent.getInstance().get()
+          .entrySet()
+          .stream()
+          .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.PAUSE)
+          .sorted(Comparator.comparingLong(entry -> entry.getValue().getTaskInfo().getStartTime()))
+          .limit(needResumeCount)
+          .forEach(entry -> {
+            entry.getValue().resume();
+            resumeIds.add(entry.getKey());
+          });
+      resumeVo.setResumeIds(resumeIds);
+    }
+    return RestUtil.buildResponse(resumeVo);
   }
-
 
   @GetMapping("tasks")
   public ResponseEntity<HttpResult> list() {
     List<TaskForm> list = HttpDownContent.getInstance().get()
         .entrySet()
         .stream()
+        .sorted((e1, e2) -> (int) (e2.getValue().getTaskInfo().getStartTime() - e1.getValue().getTaskInfo().getStartTime()))
         .map(entry -> {
           TaskForm taskForm = new TaskForm();
           taskForm.setId(entry.getKey());
@@ -164,7 +162,7 @@ public class HttpDownController {
           return taskForm;
         })
         .collect(Collectors.toList());
-    return ResponseEntity.ok().body(new HttpResult().data(list));
+    return RestUtil.buildResponse(list);
   }
 
   @GetMapping("tasks/{id}")
@@ -178,7 +176,7 @@ public class HttpDownController {
     taskForm.setRequest(HttpRequestForm.parse(bootstrap.getRequest()));
     taskForm.setConfig(bootstrap.getDownConfig());
     taskForm.setInfo(bootstrap.getTaskInfo());
-    return ResponseEntity.ok().body(new HttpResult().data(taskForm));
+    return RestUtil.buildResponse(taskForm);
   }
 
   @GetMapping("tasks/progress")
@@ -194,6 +192,45 @@ public class HttpDownController {
           return taskForm;
         })
         .collect(Collectors.toList());
-    return ResponseEntity.ok().body(new HttpResult().data(list));
+    return RestUtil.buildResponse(list);
+  }
+
+  //Pause running task
+  private List<String> handleResume(int resumeCount) {
+    List<String> list = new ArrayList<>();
+    List<Entry<String, HttpDownBootstrap>> runList = HttpDownContent.getInstance().get()
+        .entrySet()
+        .stream()
+        .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
+        .collect(Collectors.toList());
+    int needPauseCount = runList.size() + resumeCount - ConfigContent.getInstance().get().getTaskLimit();
+    if (needPauseCount > 0) {
+      for (int i = 0; i < needPauseCount; i++) {
+        Entry<String, HttpDownBootstrap> entry = runList.get(i);
+        entry.getValue().pause();
+        list.add(entry.getKey());
+      }
+    }
+    return list;
+  }
+
+  private HttpDownConfigInfo buildConfig(HttpDownConfigInfo configForm) {
+    ServerConfigInfo serverConfigInfo = ConfigContent.getInstance().get();
+    if (configForm.getConnections() <= 0) {
+      configForm.setConnections(serverConfigInfo.getConnections());
+    }
+    if (configForm.getTimeout() <= 0) {
+      configForm.setTimeout(configForm.getTimeout());
+    }
+    if (configForm.getRetryCount() <= 0) {
+      configForm.setRetryCount(configForm.getRetryCount());
+    }
+    if (!configForm.isAutoRename()) {
+      configForm.setAutoRename(serverConfigInfo.isAutoRename());
+    }
+    if (configForm.getSpeedLimit() <= 0) {
+      configForm.setSpeedLimit(configForm.getSpeedLimit());
+    }
+    return configForm;
   }
 }

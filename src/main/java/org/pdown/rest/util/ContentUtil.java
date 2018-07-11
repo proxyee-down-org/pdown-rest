@@ -3,18 +3,18 @@ package org.pdown.rest.util;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
+import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import org.pdown.core.boot.HttpDownBootstrap;
-import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.util.FileUtil;
 
 public class ContentUtil {
 
-  public static void save(Object obj, String path, boolean isHidden) throws IOException {
-    byte[] bytes = getObjectMapper().writeValueAsBytes(obj);
+  public static void save(Object obj, String path, boolean isHidden, String... ignoreFields) throws IOException {
+    byte[] bytes = getObjectMapper(ignoreFields).writeValueAsBytes(obj);
     FileUtil.initFile(path, isHidden);
     try (
         RandomAccessFile raf = new RandomAccessFile(path, "rws")
@@ -28,6 +28,10 @@ public class ContentUtil {
     ) {
       raf2.write(bytes);
     }
+  }
+
+  public static void save(Object obj, String path, boolean isHidden) throws IOException {
+    save(obj, path, isHidden,null);
   }
 
   public static void save(Object obj, String path) throws IOException {
@@ -71,24 +75,23 @@ public class ContentUtil {
   }
 
   public static ObjectMapper getObjectMapper() {
+    return getObjectMapper();
+  }
+
+  public static ObjectMapper getObjectMapper(String... ignoreFields) {
     ObjectMapper objectMapper = new ObjectMapper();
-    return objectMapper.setVisibility(objectMapper.getSerializationConfig().getDefaultVisibilityChecker()
+    objectMapper = objectMapper.setVisibility(objectMapper.getSerializationConfig().getDefaultVisibilityChecker()
         .withFieldVisibility(Visibility.ANY)
         .withIsGetterVisibility(Visibility.NONE)
         .withGetterVisibility(Visibility.NONE)
         .withSetterVisibility(Visibility.NONE)
         .withCreatorVisibility(Visibility.NONE));
-  }
-
-  public static void main(String[] args) throws IOException {
-    HttpDownBootstrap aaa = HttpDownBootstrap.builder("http://192.168.2.24/static/test.iso")
-        .downConfig(new HttpDownConfigInfo().setConnections(12))
-        .build();
-    aaa.getRequest().setContent(new byte[]{1, 2, 3});
-    save(aaa, "f:/test/list.inf");
-    HttpDownBootstrap list1 = get("f:/test/list.inf", new TypeReference<HttpDownBootstrap>() {
-    });
-    System.out.println(list1.getRequest().content().length);
-    System.out.println(list1.toString());
+    if (ignoreFields != null && ignoreFields.length > 0) {
+      SimpleFilterProvider filterProvider = new SimpleFilterProvider();
+      SimpleBeanPropertyFilter fieldFilter = SimpleBeanPropertyFilter.serializeAllExcept(ignoreFields);
+      filterProvider.addFilter("fieldFilter", fieldFilter);
+      objectMapper.setFilterProvider(filterProvider);
+    }
+    return objectMapper;
   }
 }

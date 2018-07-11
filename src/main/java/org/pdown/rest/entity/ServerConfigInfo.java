@@ -8,13 +8,13 @@ public class ServerConfigInfo extends HttpDownConfigInfo implements Serializable
 
   private static final long serialVersionUID = 8851967460594279184L;
   /**
-   * rest org.pdown.rest.test.server port
+   * rest server port
    */
   private long port;
   /**
    * Concurrent task downloads
    */
-  private long taskLimit = 3;
+  private int taskLimit = 3;
   /**
    * Total speed limit,default 0B/S
    */
@@ -32,11 +32,11 @@ public class ServerConfigInfo extends HttpDownConfigInfo implements Serializable
     this.port = port;
   }
 
-  public long getTaskLimit() {
+  public int getTaskLimit() {
     return taskLimit;
   }
 
-  public void setTaskLimit(long taskLimit) {
+  public void setTaskLimit(int taskLimit) {
     this.taskLimit = taskLimit;
   }
 

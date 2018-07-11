@@ -6,7 +6,7 @@ import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public abstract class PersistenceContent<E,T extends PersistenceContent> {
+public abstract class PersistenceContent<E, T extends PersistenceContent> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(PersistenceContent.class);
 
@@ -22,10 +22,14 @@ public abstract class PersistenceContent<E,T extends PersistenceContent> {
 
   protected abstract E defaultValue();
 
+  protected String[] ignoreFields() {
+    return null;
+  }
+
   public T save() {
     synchronized (content) {
       try {
-        ContentUtil.save(content, savePath(), isHidden());
+        ContentUtil.save(content, savePath(), isHidden(), ignoreFields());
       } catch (IOException e) {
         log("save error", e);
       }
