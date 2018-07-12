@@ -10,9 +10,10 @@ DownRestServer.start(null);
 DownRestServer.start("f:/down/rest");
 ```
 ## 接口文档
+默认服务器端口为26339,下面用{port}表示
 ### 查看服务器配置信息
 #### 请求
-GET http://127.0.0.1:26339/config  
+GET http://127.0.0.1:{port}/config  
 #### 响应
 ```
 {
