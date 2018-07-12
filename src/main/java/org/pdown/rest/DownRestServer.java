@@ -18,7 +18,7 @@ public class DownRestServer {
   public static String baseDir;
 
   //init configuration
-  public static void init(String baseDir) {
+  private static void init(String baseDir) {
     String rootPath = System.getProperty("user.dir");
     //设置slf4j日志打印目录
     System.setProperty("LOG_PATH", rootPath);
