@@ -22,6 +22,8 @@ import org.pdown.core.entity.HttpResponseInfo;
 import org.pdown.core.util.FileUtil;
 import org.pdown.core.util.OsUtil;
 import org.pdown.rest.DownRestServer;
+import org.pdown.rest.content.ConfigContent;
+import org.pdown.rest.content.HttpDownContent;
 import org.pdown.rest.entity.HttpResult;
 import org.pdown.rest.form.CreateTaskForm;
 import org.pdown.rest.form.HttpRequestForm;
@@ -74,7 +76,10 @@ public class HttpDownPauseAndResume {
   @Test
   public void serverShutdown() throws Exception {
     delRecords();
-    DownRestServer.init(null);
+    //org.pdown.rest.test.server config
+    ConfigContent.getInstance().load();
+    //download content
+    HttpDownContent.getInstance().load();
     //build random file
     TestUtil.buildRandomFile(TEST_BUILD_FILE, 1024 * 1024 * 500L);
 
@@ -94,7 +99,10 @@ public class HttpDownPauseAndResume {
 
   @Test
   public void serverResume() throws Exception {
-    DownRestServer.init(null);
+    //org.pdown.rest.test.server config
+    ConfigContent.getInstance().load();
+    //download content
+    HttpDownContent.getInstance().load();
     ObjectMapper objectMapper = ContentUtil.getObjectMapper();
     CreateTaskForm createTaskForm = new CreateTaskForm();
     createTaskForm.setRequest(new HttpRequestForm("http://127.0.0.1:" + port, null, null));

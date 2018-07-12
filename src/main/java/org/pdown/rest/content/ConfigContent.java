@@ -22,7 +22,7 @@ public class ConfigContent extends PersistenceContent<ServerConfigInfo, ConfigCo
 
   @Override
   protected String savePath() {
-    return DownRestServer.baseDir + File.separator + "config.inf";
+    return DownRestServer.getBaseDir() + File.separator + "config.inf";
   }
 
   @Override

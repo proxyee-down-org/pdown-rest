@@ -29,7 +29,10 @@ public class ConfigController {
    */
   @PutMapping
   public ResponseEntity<HttpResult> setConfig(@RequestBody ServerConfigInfo serverConfigInfo) {
-    BeanUtils.copyProperties(serverConfigInfo, ConfigContent.getInstance().get());
+    ServerConfigInfo beforeConfig = ConfigContent.getInstance().get();
+    if (beforeConfig != null) {
+      BeanUtils.copyProperties(serverConfigInfo, ConfigContent.getInstance().get());
+    }
     ConfigContent.getInstance().save();
     return RestUtil.buildResponse();
   }

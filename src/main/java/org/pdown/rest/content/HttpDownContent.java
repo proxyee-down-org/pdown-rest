@@ -37,7 +37,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
 
   @Override
   protected String savePath() {
-    return DownRestServer.baseDir + File.separator + ".records.inf";
+    return DownRestServer.getBaseDir() + File.separator + ".records.inf";
   }
 
   @Override

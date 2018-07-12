@@ -15,21 +15,24 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class DownRestServer {
 
-  public static String baseDir;
+  private static String baseDir = System.getProperty("user.dir");
+
+  public static String getBaseDir() {
+    return baseDir;
+  }
 
   //init configuration
   private static void init(String baseDir) {
     String rootPath = System.getProperty("user.dir");
     //设置slf4j日志打印目录
     System.setProperty("LOG_PATH", rootPath);
-    if (baseDir == null) {
-      baseDir = rootPath;
+    if (baseDir != null) {
+      File dir = new File(baseDir);
+      if (!dir.exists() || dir.isFile()) {
+        dir.mkdir();
+      }
+      DownRestServer.baseDir = dir.getPath();
     }
-    File dir = new File(baseDir);
-    if (!dir.exists() || dir.isFile()) {
-      dir.mkdir();
-    }
-    DownRestServer.baseDir = dir.getPath();
     //org.pdown.rest.test.server config
     ConfigContent.getInstance().load();
     //download content

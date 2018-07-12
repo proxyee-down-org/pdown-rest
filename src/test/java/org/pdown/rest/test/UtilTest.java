@@ -12,7 +12,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.pdown.rest.DownRestServer;
 import org.pdown.rest.form.HttpRequestForm;
-import org.pdown.rest.test.common.TestEnvironment;
+import org.pdown.rest.test.common.TestDownEnvironment;
 import org.pdown.rest.util.ContentUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -27,7 +27,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(webEnvironment = WebEnvironment.RANDOM_PORT, classes = DownRestServer.class)
 @AutoConfigureMockMvc
 public class UtilTest {
-  private TestEnvironment testEnvironment = new TestEnvironment();
+
+  private TestDownEnvironment testEnvironment = new TestDownEnvironment();
 
   @Autowired
   private MockMvc mockMvc;

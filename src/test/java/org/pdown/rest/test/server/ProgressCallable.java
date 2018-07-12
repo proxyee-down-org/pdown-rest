@@ -22,7 +22,7 @@ public class ProgressCallable implements Callable {
   private MockMvc mockMvc;
   private String taskId;
 
-  public ProgressCallable(MockMvc mockMvc,String taskId) {
+  public ProgressCallable(MockMvc mockMvc, String taskId) {
     this.mockMvc = mockMvc;
     this.taskId = taskId;
   }

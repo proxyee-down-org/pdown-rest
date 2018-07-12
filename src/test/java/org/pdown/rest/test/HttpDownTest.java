@@ -17,22 +17,18 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpResponseInfo;
-import org.pdown.core.util.FileUtil;
-import org.pdown.core.util.OsUtil;
 import org.pdown.rest.DownRestServer;
 import org.pdown.rest.entity.HttpResult;
 import org.pdown.rest.form.CreateTaskForm;
 import org.pdown.rest.form.HttpRequestForm;
-import org.pdown.rest.test.common.TestEnvironment;
+import org.pdown.rest.test.common.TestDownEnvironment;
 import org.pdown.rest.test.server.ProgressCallable;
-import org.pdown.rest.test.server.RangeDownTestServer;
 import org.pdown.rest.test.util.TestUtil;
 import org.pdown.rest.util.ContentUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -43,7 +39,7 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 public class HttpDownTest {
 
-  private TestEnvironment testEnvironment = new TestEnvironment();
+  private TestDownEnvironment testEnvironment = new TestDownEnvironment();
 
   @Autowired
   private MockMvc mockMvc;
