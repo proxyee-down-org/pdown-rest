@@ -1,21 +1,33 @@
 # HTTP downloader RESTful server
+
 HTTP下载服务器，可以通过RESTful的方式对下载器进行调用.
+
 ## 启动
+
 启动服务需要指定根路径,若为空时会默认使用程序运行所在目录。  
-当服务启动成功时会读取根路径里的config.inf文件，里面包含服务器基本的配置信息，若不存在的话会使用默认值。
-```
-//Use default root path
+当服务启动成功时会读取根路径里的`config.inf`文件，里面包含服务器基本的配置信息，若不存在的话会使用默认值。
+
+```java
+// 使用默认目录，默认目录为当前程序所在目录
 DownRestServer.start(null);
-//Use the specified root path
+
+// 使用指定的目录
 DownRestServer.start("f:/down/rest");
 ```
+
 ## 接口文档
-默认服务器端口为26339,下面用{port}表示
+
+> 默认服务器端口为26339
+
 ### 查看服务器配置信息
+
 #### 请求
-GET http://127.0.0.1:{port}/config  
+
+GET http://127.0.0.1:26339/config
+
 #### 响应
-```
+
+```json
 {
     "data": {
         "filePath": null,
@@ -38,6 +50,7 @@ GET http://127.0.0.1:{port}/config
     "msg": null
 }
 ```
+
 参数 | 描述 
 ---|---
 data.filePath | 默认下载路径 
@@ -50,8 +63,8 @@ data.totalSpeedLimit | 下载器总的速度限制(B/S)
 data.port | 服务器端口，重启后生效
 data.taskLimit | 最大同时下载的任务数量
 data.proxyConfig | 二级代理设置
-data.proxyConfig.proxyType | 类型(HTTP,SOCKS4,SOCKS5)
-data.proxyConfig.host | 地址
-data.proxyConfig.port | 端口
-data.proxyConfig.user | 用户名
-data.proxyConfig.pwd | 密码
+data.proxyConfig.proxyType | 代理类型(HTTP,SOCKS4,SOCKS5)
+data.proxyConfig.host | 代理地址
+data.proxyConfig.port | 代理端口
+data.proxyConfig.user | 代理用户名
+data.proxyConfig.pwd | 代理密码
