@@ -1,7 +1,6 @@
 package org.pdown.rest.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.internal.StringUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,7 +15,6 @@ import org.pdown.core.boot.HttpDownBootstrapBuilder;
 import org.pdown.core.constant.HttpDownStatus;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpRequestInfo;
-import org.pdown.core.entity.HttpResponseInfo;
 import org.pdown.core.util.HttpDownUtil;
 import org.pdown.rest.base.exception.NotFoundException;
 import org.pdown.rest.base.exception.ParameterException;
@@ -27,7 +25,6 @@ import org.pdown.rest.entity.ServerConfigInfo;
 import org.pdown.rest.form.CreateTaskForm;
 import org.pdown.rest.form.HttpRequestForm;
 import org.pdown.rest.form.TaskForm;
-import org.pdown.rest.util.RestUtil;
 import org.pdown.rest.vo.ResumeVo;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
@@ -38,19 +35,20 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-public class HttpDownController {
+public class TaskController {
+
   /*
-  Create a download task, join the download queue after requesting parsing task related information.
+  Create a download task
    */
   @PostMapping("tasks")
-  public ResponseEntity<HttpResult> create(HttpServletRequest request) throws Exception {
+  public ResponseEntity create(HttpServletRequest request) throws Exception {
     ObjectMapper mapper = new ObjectMapper();
     CreateTaskForm createTaskForm = mapper.readValue(request.getInputStream(), CreateTaskForm.class);
     if (createTaskForm.getRequest() == null) {
-      throw new ParameterException("request can' be empty");
+      throw new ParameterException(4001, "request can' be empty");
     }
     if (StringUtils.isEmpty(createTaskForm.getRequest().getUrl())) {
-      throw new ParameterException("url can'content be empty");
+      throw new ParameterException(4002, "url can'content be empty");
     }
     HttpDownBootstrapBuilder bootstrapBuilder;
     //if know response Content-Length and file name,can create a task directly, without spending a request to resolve the task name and size.
@@ -65,7 +63,6 @@ public class HttpDownController {
     HttpDownBootstrap httpDownBootstrap = bootstrapBuilder.response(createTaskForm.getResponse())
         .downConfig(buildConfig(createTaskForm.getConfig()))
         .callback(new PersistenceHttpDownCallback())
-        .proxyConfig(ConfigContent.getInstance().get().getProxyConfig())
         .build();
     HttpDownContent downContent = HttpDownContent.getInstance();
     String id = UUID.randomUUID().toString();
@@ -78,17 +75,17 @@ public class HttpDownController {
       }
     }
     downContent.put(id, httpDownBootstrap).save();
-    return RestUtil.buildResponse(id);
+    return ResponseEntity.ok(id);
   }
 
   @PutMapping("tasks/{id}/pause")
-  public ResponseEntity<HttpResult> pauseDown(@PathVariable String id) {
+  public ResponseEntity pauseDown(@PathVariable String id) {
     HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
     if (bootstrap == null) {
       throw new NotFoundException("task does not exist");
     }
     HttpDownContent.getInstance().get(id).pause();
-    return RestUtil.buildResponse();
+    return ResponseEntity.ok(null);
   }
 
   @PutMapping("tasks/pause")
@@ -98,13 +95,12 @@ public class HttpDownController {
         .values()
         .stream()
         .filter(httpDownBootstrap -> httpDownBootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
-        .forEach(httpDownBootstrap -> httpDownBootstrap.setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
-            .pause());
-    return RestUtil.buildResponse();
+        .forEach(httpDownBootstrap -> httpDownBootstrap.pause());
+    return ResponseEntity.ok(null);
   }
 
   @PutMapping("tasks/{id}/resume")
-  public ResponseEntity<HttpResult> resume(@PathVariable String id) {
+  public ResponseEntity resume(@PathVariable String id) {
     ResumeVo resumeVo = new ResumeVo();
     HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
     if (bootstrap == null) {
@@ -113,15 +109,13 @@ public class HttpDownController {
     resumeVo.setResumeIds(Arrays.asList(new String[]{id}));
     if (HttpDownContent.getInstance().get(id).getTaskInfo().getStatus() == HttpDownStatus.PAUSE) {
       resumeVo.setPauseIds(handleResume(1));
-      HttpDownContent.getInstance().get(id)
-          .setProxyConfig(ConfigContent.getInstance().get().getProxyConfig())
-          .resume();
+      HttpDownContent.getInstance().get(id).resume();
     }
-    return RestUtil.buildResponse(resumeVo);
+    return ResponseEntity.ok(null);
   }
 
   @PutMapping("tasks/resume")
-  public ResponseEntity<HttpResult> resumeAll() {
+  public ResponseEntity resumeAll() {
     ResumeVo resumeVo = new ResumeVo();
     resumeVo.setPauseIds(handleResume(0));
     int runCount = (int) HttpDownContent.getInstance().get()
@@ -144,11 +138,11 @@ public class HttpDownController {
           });
       resumeVo.setResumeIds(resumeIds);
     }
-    return RestUtil.buildResponse(resumeVo);
+    return ResponseEntity.ok(resumeVo);
   }
 
   @GetMapping("tasks")
-  public ResponseEntity<HttpResult> list() {
+  public ResponseEntity list() {
     List<TaskForm> list = HttpDownContent.getInstance().get()
         .entrySet()
         .stream()
@@ -162,11 +156,11 @@ public class HttpDownController {
           return taskForm;
         })
         .collect(Collectors.toList());
-    return RestUtil.buildResponse(list);
+    return ResponseEntity.ok(list);
   }
 
   @GetMapping("tasks/{id}")
-  public ResponseEntity<HttpResult> detail(@PathVariable String id) {
+  public ResponseEntity detail(@PathVariable String id) {
     HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
     if (bootstrap == null) {
       throw new NotFoundException("task does not exist");
@@ -176,11 +170,11 @@ public class HttpDownController {
     taskForm.setRequest(HttpRequestForm.parse(bootstrap.getRequest()));
     taskForm.setConfig(bootstrap.getDownConfig());
     taskForm.setInfo(bootstrap.getTaskInfo());
-    return RestUtil.buildResponse(taskForm);
+    return ResponseEntity.ok(taskForm);
   }
 
   @GetMapping("tasks/progress")
-  public ResponseEntity<HttpResult> progress() {
+  public ResponseEntity progress() {
     List<TaskForm> list = HttpDownContent.getInstance().get()
         .entrySet()
         .stream()
@@ -192,7 +186,7 @@ public class HttpDownController {
           return taskForm;
         })
         .collect(Collectors.toList());
-    return RestUtil.buildResponse(list);
+    return ResponseEntity.ok(list);
   }
 
   //Pause running task

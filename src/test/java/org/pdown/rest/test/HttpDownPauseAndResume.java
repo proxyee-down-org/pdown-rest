@@ -91,7 +91,6 @@ public class HttpDownPauseAndResume {
     mockMvc.perform(post("/tasks")
         .content(objectMapper.writeValueAsString(createTaskForm)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").exists())
         .andReturn();
     Thread.sleep(2333);
     System.exit(1);
@@ -112,11 +111,11 @@ public class HttpDownPauseAndResume {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data").exists())
         .andReturn();
-    TypeReference taskIdsType = new TypeReference<HttpResult<List<String>>>() {
+    TypeReference taskIdsType = new TypeReference<List<String>>() {
     };
-    HttpResult<List<String>> taskIdsResult = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), taskIdsType);
-    System.out.println("taskIds:" + taskIdsResult.getData());
-    Future future = Executors.newCachedThreadPool().submit(new ProgressCallable(mockMvc, taskIdsResult.getData().get(0)));
+    List<String> taskIdsResult = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), taskIdsType);
+    System.out.println("taskIds:" + taskIdsResult);
+    Future future = Executors.newCachedThreadPool().submit(new ProgressCallable(mockMvc, taskIdsResult.get(0)));
     future.get();
     //Compare MD5
     Assert.assertEquals(TestUtil.getMd5ByFile(new File(TEST_BUILD_FILE)), TestUtil.getMd5ByFile(new File(DOWN_FILE)));

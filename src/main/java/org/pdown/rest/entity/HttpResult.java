@@ -1,16 +1,16 @@
 package org.pdown.rest.entity;
 
-public class HttpResult<T> {
+public class HttpResult {
 
-  private T data;
+  private int code;
   private String msg;
 
-  public T getData() {
-    return data;
+  public int getCode() {
+    return code;
   }
 
-  public void setData(T data) {
-    this.data = data;
+  public void setCode(int code) {
+    this.code = code;
   }
 
   public String getMsg() {
@@ -21,8 +21,9 @@ public class HttpResult<T> {
     this.msg = msg;
   }
 
-  public HttpResult data(T data) {
-    this.data = data;
+
+  public HttpResult code(int code) {
+    this.code = code;
     return this;
   }
 
@@ -34,7 +35,7 @@ public class HttpResult<T> {
   @Override
   public String toString() {
     return "HttpResult{" +
-        "data=" + data +
+        "code=" + code +
         ", msg='" + msg + '\'' +
         '}';
   }

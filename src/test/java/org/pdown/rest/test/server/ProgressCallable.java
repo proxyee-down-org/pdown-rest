@@ -29,24 +29,22 @@ public class ProgressCallable implements Callable {
 
   @Override
   public Object call() throws Exception {
-    TypeReference progressType = new TypeReference<HttpResult<List<TaskForm>>>() {
+    TypeReference progressType = new TypeReference<List<TaskForm>>() {
     };
     ObjectMapper objectMapper = ContentUtil.getObjectMapper();
     while (true) {
       try {
         MvcResult mvcResult = mockMvc.perform(get("/tasks/progress"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.data").isArray())
+            .andExpect(jsonPath("$").isArray())
             .andReturn();
-        HttpResult<List<TaskForm>> httpResultArray = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), progressType);
-        List<TaskForm> list = httpResultArray.getData();
+        List<TaskForm> list = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), progressType);
         if (list == null || list.size() == 0) {
           MvcResult taskResult = mockMvc.perform(get("/tasks/" + taskId)).andReturn();
           if (taskResult.getResponse().getStatus() == 200) {
-            TypeReference taskType = new TypeReference<HttpResult<TaskForm>>() {
+            TypeReference taskType = new TypeReference<TaskForm>() {
             };
-            HttpResult<TaskForm> taskResultForm = objectMapper.readValue(taskResult.getResponse().getContentAsString(), taskType);
-            TaskForm taskForm = taskResultForm.getData();
+            TaskForm taskForm = objectMapper.readValue(taskResult.getResponse().getContentAsString(), taskType);
             if (taskForm.getInfo().getStatus() == HttpDownStatus.DONE) {
               break;
             }

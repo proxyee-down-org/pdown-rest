@@ -21,13 +21,16 @@ public class GlobalErrorExceptionAdvice {
   @ExceptionHandler(ParameterException.class)
   @ResponseBody
   public ResponseEntity<HttpResult> handleBad(HttpServletResponse response, Exception e) {
-    return ResponseEntity.badRequest().body(new HttpResult().msg("parameters error:" + e.getMessage()));
+    ParameterException exception = (ParameterException) e;
+    return ResponseEntity.badRequest().body(new HttpResult()
+        .code(exception.getCode())
+        .msg("parameters error:" + exception.getMessage()));
   }
 
   @ExceptionHandler(JsonProcessingException.class)
   @ResponseBody
   public ResponseEntity<HttpResult> handleJsonParseError(HttpServletResponse response, Exception e) {
-    return ResponseEntity.badRequest().body(new HttpResult().msg("parameters error"));
+    return ResponseEntity.badRequest().body(new HttpResult().code(5001).msg("parameters error"));
   }
 
   @ExceptionHandler(NotFoundException.class)
@@ -40,7 +43,7 @@ public class GlobalErrorExceptionAdvice {
   @ResponseBody
   public ResponseEntity<HttpResult> handleError(HttpServletResponse response, Exception e) {
     LOGGER.error("request error:", e);
-    return new ResponseEntity<>(new HttpResult().msg("server error"), HttpStatus.INTERNAL_SERVER_ERROR);
+    return new ResponseEntity<>(new HttpResult().code(5000).msg("server error"), HttpStatus.INTERNAL_SERVER_ERROR);
   }
 
 }

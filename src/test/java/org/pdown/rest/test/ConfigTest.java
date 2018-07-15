@@ -59,8 +59,7 @@ public class ConfigTest {
         .andExpect(status().isOk());
     mockMvc.perform(get("/config"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").exists())
-        .andExpect(jsonPath("$.data.connections").value(32))
-        .andExpect(jsonPath("$.data.taskLimit").value(5));
+        .andExpect(jsonPath("$.connections").value(32))
+        .andExpect(jsonPath("$.taskLimit").value(5));
   }
 }

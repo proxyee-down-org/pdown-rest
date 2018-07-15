@@ -3,6 +3,7 @@ package org.pdown.rest.controller;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.pdown.core.constant.HttpDownStatus;
+import org.pdown.core.proxy.ProxyConfig;
 import org.pdown.rest.content.ConfigContent;
 import org.pdown.rest.content.HttpDownContent;
 import org.pdown.core.boot.HttpDownBootstrap;
@@ -14,6 +15,7 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
 
   @Override
   public void onStart(HttpDownBootstrap httpDownBootstrap) {
+    commonConfig(httpDownBootstrap);
     calcSpeedLimit();
   }
 
@@ -25,6 +27,7 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
 
   @Override
   public void onResume(HttpDownBootstrap httpDownBootstrap) {
+    commonConfig(httpDownBootstrap);
     calcSpeedLimit();
     HttpDownContent.getInstance().save();
   }
@@ -49,6 +52,18 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
   public void onDone(HttpDownBootstrap httpDownBootstrap) {
     calcSpeedLimit();
     HttpDownContent.getInstance().save();
+  }
+
+  private void commonConfig(HttpDownBootstrap httpDownBootstrap) {
+    ServerConfigInfo serverConfigInfo = ConfigContent.getInstance().get();
+    long speedLimit = serverConfigInfo.getSpeedLimit();
+    ProxyConfig proxyConfig = serverConfigInfo.getProxyConfig();
+    if (speedLimit > 0) {
+      httpDownBootstrap.getDownConfig().setSpeedLimit(speedLimit);
+    }
+    if (proxyConfig != null) {
+      httpDownBootstrap.setProxyConfig(proxyConfig);
+    }
   }
 
   private void calcSpeedLimit() {

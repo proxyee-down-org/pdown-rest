@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -62,23 +63,19 @@ public class HttpDownTest {
     createTaskForm.setConfig(new HttpDownConfigInfo().setFilePath(testEnvironment.getTestDir()).setConnections(2));
     createTaskForm.setResponse(new HttpResponseInfo(testEnvironment.getDownFileName()));
     MvcResult result = mockMvc.perform(post("/tasks")
-//        .contentType(MediaType.APPLICATION_JSON_UTF8)
+        .contentType(MediaType.APPLICATION_JSON_UTF8)
         .content(objectMapper.writeValueAsString(createTaskForm)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").exists())
         .andReturn();
-    HttpResult httpResult = objectMapper.readValue(result.getResponse().getContentAsString(), HttpResult.class);
-    String taskId = httpResult.getData().toString();
+    String taskId = result.getResponse().getContentAsString();
     Future future = Executors.newCachedThreadPool().submit(new ProgressCallable(mockMvc, taskId));
     Thread.sleep(233);
     mockMvc.perform(put("/tasks/" + taskId + "/pause"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msg").value("success"));
+        .andExpect(status().isOk());
     //Pause for 3 seconds
     Thread.sleep(3000);
     mockMvc.perform(put("/tasks/" + taskId + "/resume"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.msg").value("success"));
+        .andExpect(status().isOk());
     future.get();
     //Compare MD5
     Assert.assertEquals(TestUtil.getMd5ByFile(new File(testEnvironment.getBuildFilePath())),

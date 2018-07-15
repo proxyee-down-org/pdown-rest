@@ -51,8 +51,8 @@ public class UtilTest {
     mockMvc.perform(post("/util/resolve").contentType(MediaType.APPLICATION_JSON_UTF8)
         .content(objectMapper.writeValueAsString(httpRequestForm)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data.fileName").exists())
-        .andExpect(jsonPath("$.data.totalSize").exists())
-        .andExpect(jsonPath("$.data.supportRange").value(true));
+        .andExpect(jsonPath("$.fileName").exists())
+        .andExpect(jsonPath("$.totalSize").exists())
+        .andExpect(jsonPath("$.supportRange").value(true));
   }
 }
