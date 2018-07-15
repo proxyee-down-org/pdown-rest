@@ -122,7 +122,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
     return this;
   }
 
-  private String progressSavePath(HttpDownConfigInfo config, HttpResponseInfo response) {
+  public String progressSavePath(HttpDownConfigInfo config,HttpResponseInfo response) {
     return config.getFilePath() + File.separator + "." + response.getFileName() + ".inf";
   }
 
@@ -132,7 +132,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
       if (taskInfo != null) {
         try {
           synchronized (bootstrap) {
-            ContentUtil.save(taskInfo, progressSavePath(bootstrap.getDownConfig(), bootstrap.getResponse()), isHidden());
+            ContentUtil.save(taskInfo, progressSavePath(bootstrap.getDownConfig(),bootstrap.getResponse()), isHidden());
           }
         } catch (IOException e) {
           log("save progress error", e);

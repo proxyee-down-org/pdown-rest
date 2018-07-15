@@ -64,7 +64,7 @@ public class ContentUtil {
     }
   }
 
-  private static String buildBakPath(String path) {
+  public static String buildBakPath(String path) {
     File saveFile = new File(path);
     StringBuilder sb = new StringBuilder(saveFile.getParent() + File.separator);
     if (saveFile.getName().indexOf(".") != 0) {

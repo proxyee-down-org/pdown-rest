@@ -2,11 +2,13 @@ package org.pdown.rest.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.internal.StringUtil;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
@@ -15,6 +17,7 @@ import org.pdown.core.boot.HttpDownBootstrapBuilder;
 import org.pdown.core.constant.HttpDownStatus;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpRequestInfo;
+import org.pdown.core.util.FileUtil;
 import org.pdown.core.util.HttpDownUtil;
 import org.pdown.rest.base.exception.NotFoundException;
 import org.pdown.rest.base.exception.ParameterException;
@@ -25,13 +28,16 @@ import org.pdown.rest.entity.ServerConfigInfo;
 import org.pdown.rest.form.CreateTaskForm;
 import org.pdown.rest.form.HttpRequestForm;
 import org.pdown.rest.form.TaskForm;
+import org.pdown.rest.util.ContentUtil;
 import org.pdown.rest.vo.ResumeVo;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -78,6 +84,69 @@ public class TaskController {
     return ResponseEntity.ok(id);
   }
 
+  @GetMapping("tasks")
+  public ResponseEntity list() {
+    List<TaskForm> list = HttpDownContent.getInstance().get()
+        .entrySet()
+        .stream()
+        .sorted((e1, e2) -> (int) (e2.getValue().getTaskInfo().getStartTime() - e1.getValue().getTaskInfo().getStartTime()))
+        .map(entry -> {
+          TaskForm taskForm = new TaskForm();
+          taskForm.setId(entry.getKey());
+          taskForm.setRequest(HttpRequestForm.parse(entry.getValue().getRequest()));
+          taskForm.setConfig(entry.getValue().getDownConfig());
+          taskForm.setInfo(entry.getValue().getTaskInfo());
+          return taskForm;
+        })
+        .collect(Collectors.toList());
+    return ResponseEntity.ok(list);
+  }
+
+  @GetMapping("tasks/{id}")
+  public ResponseEntity detail(@PathVariable String id) {
+    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
+    if (bootstrap == null) {
+      throw new NotFoundException("task does not exist");
+    }
+    TaskForm taskForm = new TaskForm();
+    taskForm.setId(id);
+    taskForm.setRequest(HttpRequestForm.parse(bootstrap.getRequest()));
+    taskForm.setConfig(bootstrap.getDownConfig());
+    taskForm.setInfo(bootstrap.getTaskInfo());
+    return ResponseEntity.ok(taskForm);
+  }
+
+  @DeleteMapping("tasks/{id}")
+  public ResponseEntity delete(@PathVariable String id,@RequestParam(required = false) int delFile)
+      throws IOException {
+    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
+    if (bootstrap == null) {
+      throw new NotFoundException("task does not exist");
+    }
+    bootstrap.close();
+    HttpDownContent httpDownContent = HttpDownContent.getInstance();
+    //Delete download progress record file
+    String recordFile = httpDownContent.progressSavePath(bootstrap.getDownConfig(),bootstrap.getResponse());
+    FileUtil.deleteIfExists(recordFile);
+    FileUtil.deleteIfExists(ContentUtil.buildBakPath(recordFile));
+    if(delFile==1){
+      //Delete download file
+      FileUtil.deleteIfExists(HttpDownUtil.getTaskFilePath(bootstrap));
+    }
+    httpDownContent.remove(id).save();
+    return ResponseEntity.ok(null);
+  }
+
+  @DeleteMapping("tasks")
+  public ResponseEntity delete(@RequestParam(required = false) int delFile)
+      throws IOException {
+    Set<Entry<String,HttpDownBootstrap>> bootstraps = HttpDownContent.getInstance().get().entrySet();
+    for (Entry<String,HttpDownBootstrap> entry : bootstraps) {
+      delete(entry.getKey(),delFile);
+    }
+    return ResponseEntity.ok(null);
+  }
+
   @PutMapping("tasks/{id}/pause")
   public ResponseEntity pauseDown(@PathVariable String id) {
     HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
@@ -111,7 +180,7 @@ public class TaskController {
       resumeVo.setPauseIds(handleResume(1));
       HttpDownContent.getInstance().get(id).resume();
     }
-    return ResponseEntity.ok(null);
+    return ResponseEntity.ok(resumeVo);
   }
 
   @PutMapping("tasks/resume")
@@ -139,38 +208,6 @@ public class TaskController {
       resumeVo.setResumeIds(resumeIds);
     }
     return ResponseEntity.ok(resumeVo);
-  }
-
-  @GetMapping("tasks")
-  public ResponseEntity list() {
-    List<TaskForm> list = HttpDownContent.getInstance().get()
-        .entrySet()
-        .stream()
-        .sorted((e1, e2) -> (int) (e2.getValue().getTaskInfo().getStartTime() - e1.getValue().getTaskInfo().getStartTime()))
-        .map(entry -> {
-          TaskForm taskForm = new TaskForm();
-          taskForm.setId(entry.getKey());
-          taskForm.setRequest(HttpRequestForm.parse(entry.getValue().getRequest()));
-          taskForm.setConfig(entry.getValue().getDownConfig());
-          taskForm.setInfo(entry.getValue().getTaskInfo());
-          return taskForm;
-        })
-        .collect(Collectors.toList());
-    return ResponseEntity.ok(list);
-  }
-
-  @GetMapping("tasks/{id}")
-  public ResponseEntity detail(@PathVariable String id) {
-    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
-    if (bootstrap == null) {
-      throw new NotFoundException("task does not exist");
-    }
-    TaskForm taskForm = new TaskForm();
-    taskForm.setId(id);
-    taskForm.setRequest(HttpRequestForm.parse(bootstrap.getRequest()));
-    taskForm.setConfig(bootstrap.getDownConfig());
-    taskForm.setInfo(bootstrap.getTaskInfo());
-    return ResponseEntity.ok(taskForm);
   }
 
   @GetMapping("tasks/progress")
