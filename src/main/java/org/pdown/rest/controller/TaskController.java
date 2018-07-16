@@ -51,10 +51,10 @@ public class TaskController {
     ObjectMapper mapper = new ObjectMapper();
     CreateTaskForm createTaskForm = mapper.readValue(request.getInputStream(), CreateTaskForm.class);
     if (createTaskForm.getRequest() == null) {
-      throw new ParameterException(4001, "request can' be empty");
+      throw new ParameterException(4001, "request can't be empty");
     }
     if (StringUtils.isEmpty(createTaskForm.getRequest().getUrl())) {
-      throw new ParameterException(4002, "url can'content be empty");
+      throw new ParameterException(4002, "URL can't be empty");
     }
     HttpDownBootstrapBuilder bootstrapBuilder;
     //if know response Content-Length and file name,can create a task directly, without spending a request to resolve the task name and size.
@@ -81,7 +81,12 @@ public class TaskController {
       }
     }
     downContent.put(id, httpDownBootstrap).save();
-    return ResponseEntity.ok(id);
+    TaskForm taskForm = new TaskForm();
+    taskForm.setId(id);
+    taskForm.setRequest(HttpRequestForm.parse(httpDownBootstrap.getRequest()));
+    taskForm.setConfig(httpDownBootstrap.getDownConfig());
+    taskForm.setInfo(httpDownBootstrap.getTaskInfo());
+    return ResponseEntity.ok(taskForm);
   }
 
   @GetMapping("tasks")
@@ -117,7 +122,7 @@ public class TaskController {
   }
 
   @DeleteMapping("tasks/{id}")
-  public ResponseEntity delete(@PathVariable String id,@RequestParam(required = false) int delFile)
+  public ResponseEntity delete(@PathVariable String id, @RequestParam(required = false) boolean delFile)
       throws IOException {
     HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
     if (bootstrap == null) {
@@ -126,10 +131,10 @@ public class TaskController {
     bootstrap.close();
     HttpDownContent httpDownContent = HttpDownContent.getInstance();
     //Delete download progress record file
-    String recordFile = httpDownContent.progressSavePath(bootstrap.getDownConfig(),bootstrap.getResponse());
+    String recordFile = httpDownContent.progressSavePath(bootstrap.getDownConfig(), bootstrap.getResponse());
     FileUtil.deleteIfExists(recordFile);
     FileUtil.deleteIfExists(ContentUtil.buildBakPath(recordFile));
-    if(delFile==1){
+    if (delFile) {
       //Delete download file
       FileUtil.deleteIfExists(HttpDownUtil.getTaskFilePath(bootstrap));
     }
@@ -138,11 +143,11 @@ public class TaskController {
   }
 
   @DeleteMapping("tasks")
-  public ResponseEntity delete(@RequestParam(required = false) int delFile)
+  public ResponseEntity delete(@RequestParam(required = false) boolean delFile)
       throws IOException {
-    Set<Entry<String,HttpDownBootstrap>> bootstraps = HttpDownContent.getInstance().get().entrySet();
-    for (Entry<String,HttpDownBootstrap> entry : bootstraps) {
-      delete(entry.getKey(),delFile);
+    Set<Entry<String, HttpDownBootstrap>> bootstraps = HttpDownContent.getInstance().get().entrySet();
+    for (Entry<String, HttpDownBootstrap> entry : bootstraps) {
+      delete(entry.getKey(), delFile);
     }
     return ResponseEntity.ok(null);
   }
@@ -211,18 +216,16 @@ public class TaskController {
   }
 
   @GetMapping("tasks/progress")
-  public ResponseEntity progress() {
-    List<TaskForm> list = HttpDownContent.getInstance().get()
-        .entrySet()
-        .stream()
-        .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
-        .map(entry -> {
-          TaskForm taskForm = new TaskForm();
-          taskForm.setId(entry.getKey());
-          taskForm.setInfo(entry.getValue().getTaskInfo());
-          return taskForm;
-        })
-        .collect(Collectors.toList());
+  public ResponseEntity progress(@RequestParam(required = false) String[] ids) {
+    if (ids == null || ids.length == 0) {
+      throw new NotFoundException("tasks progress does not exist");
+    }
+    List<TaskForm> list = Arrays.stream(ids).map(id -> {
+      TaskForm taskForm = new TaskForm();
+      taskForm.setId(id);
+      taskForm.setInfo(HttpDownContent.getInstance().get(id).getTaskInfo());
+      return taskForm;
+    }).collect(Collectors.toList());
     return ResponseEntity.ok(list);
   }
 

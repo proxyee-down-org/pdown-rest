@@ -5,9 +5,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.After;
@@ -21,6 +23,7 @@ import org.pdown.rest.DownRestServer;
 import org.pdown.rest.entity.HttpResult;
 import org.pdown.rest.form.CreateTaskForm;
 import org.pdown.rest.form.HttpRequestForm;
+import org.pdown.rest.form.TaskForm;
 import org.pdown.rest.test.common.TestDownEnvironment;
 import org.pdown.rest.test.server.ProgressCallable;
 import org.pdown.rest.test.util.TestUtil;
@@ -67,7 +70,10 @@ public class HttpDownTest {
         .content(objectMapper.writeValueAsString(createTaskForm)))
         .andExpect(status().isOk())
         .andReturn();
-    String taskId = result.getResponse().getContentAsString();
+    TypeReference taskFormType = new TypeReference<TaskForm>() {
+    };
+    TaskForm taskForm = objectMapper.readValue(result.getResponse().getContentAsString(), taskFormType);
+    String taskId = taskForm.getId();
     Future future = Executors.newCachedThreadPool().submit(new ProgressCallable(mockMvc, taskId));
     Thread.sleep(233);
     mockMvc.perform(put("/tasks/" + taskId + "/pause"))

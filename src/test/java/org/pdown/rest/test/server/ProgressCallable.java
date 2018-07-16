@@ -34,24 +34,19 @@ public class ProgressCallable implements Callable {
     ObjectMapper objectMapper = ContentUtil.getObjectMapper();
     while (true) {
       try {
-        MvcResult mvcResult = mockMvc.perform(get("/tasks/progress"))
+        MvcResult mvcResult = mockMvc.perform(get("/tasks/progress").param("ids", taskId))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$").isArray())
             .andReturn();
         List<TaskForm> list = objectMapper.readValue(mvcResult.getResponse().getContentAsString(), progressType);
         if (list == null || list.size() == 0) {
-          MvcResult taskResult = mockMvc.perform(get("/tasks/" + taskId)).andReturn();
-          if (taskResult.getResponse().getStatus() == 200) {
-            TypeReference taskType = new TypeReference<TaskForm>() {
-            };
-            TaskForm taskForm = objectMapper.readValue(taskResult.getResponse().getContentAsString(), taskType);
-            if (taskForm.getInfo().getStatus() == HttpDownStatus.DONE) {
-              break;
-            }
-          }
+          break;
         } else {
           TaskInfo taskInfo = list.get(0).getInfo();
           System.out.println("speed:" + ByteUtil.byteFormat(taskInfo.getSpeed()) + "/S");
+          if (taskInfo.getStatus() == HttpDownStatus.DONE) {
+            break;
+          }
         }
         Thread.sleep(1000);
       } catch (Exception e) {

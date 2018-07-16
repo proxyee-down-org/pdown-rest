@@ -1,6 +1,6 @@
 package org.pdown.rest.test;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -48,7 +48,7 @@ public class UtilTest {
     ObjectMapper objectMapper = ContentUtil.getObjectMapper();
     HttpRequestForm httpRequestForm = new HttpRequestForm();
     httpRequestForm.setUrl("http://127.0.0.1:" + testEnvironment.getPort());
-    mockMvc.perform(post("/util/resolve").contentType(MediaType.APPLICATION_JSON_UTF8)
+    mockMvc.perform(put("/util/resolve").contentType(MediaType.APPLICATION_JSON_UTF8)
         .content(objectMapper.writeValueAsString(httpRequestForm)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.fileName").exists())

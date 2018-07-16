@@ -10,7 +10,7 @@ import org.pdown.rest.base.exception.ParameterException;
 import org.pdown.rest.form.HttpRequestForm;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,7 +21,7 @@ public class UtilController {
   /*
     Resolve request
      */
-  @PostMapping("resolve")
+  @PutMapping("resolve")
   public ResponseEntity resolve(HttpServletRequest request) throws Exception {
     NioEventLoopGroup loopGroup = null;
     try {
