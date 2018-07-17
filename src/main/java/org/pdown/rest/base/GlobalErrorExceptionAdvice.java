@@ -1,10 +1,10 @@
 package org.pdown.rest.base;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import javax.servlet.http.HttpServletResponse;
 import org.pdown.rest.base.exception.NotFoundException;
 import org.pdown.rest.base.exception.ParameterException;
 import org.pdown.rest.entity.HttpResult;
-import javax.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;

@@ -2,13 +2,13 @@ package org.pdown.rest.controller;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import org.pdown.core.boot.HttpDownBootstrap;
 import org.pdown.core.constant.HttpDownStatus;
+import org.pdown.core.dispatch.HttpDownCallback;
+import org.pdown.core.entity.ChunkInfo;
 import org.pdown.core.proxy.ProxyConfig;
 import org.pdown.rest.content.ConfigContent;
 import org.pdown.rest.content.HttpDownContent;
-import org.pdown.core.boot.HttpDownBootstrap;
-import org.pdown.core.dispatch.HttpDownCallback;
-import org.pdown.core.entity.ChunkInfo;
 import org.pdown.rest.entity.ServerConfigInfo;
 
 public class PersistenceHttpDownCallback extends HttpDownCallback {

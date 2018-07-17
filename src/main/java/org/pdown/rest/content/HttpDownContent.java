@@ -1,22 +1,22 @@
 package org.pdown.rest.content;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import java.io.File;
 import java.io.IOException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import org.pdown.core.boot.HttpDownBootstrap;
 import org.pdown.core.constant.HttpDownStatus;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpRequestInfo;
 import org.pdown.core.entity.HttpResponseInfo;
 import org.pdown.core.entity.TaskInfo;
 import org.pdown.core.util.HttpDownUtil;
-import org.pdown.rest.DownRestServer;
 import org.pdown.rest.base.content.PersistenceContent;
-import java.io.File;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import org.pdown.core.boot.HttpDownBootstrap;
 import org.pdown.rest.controller.PersistenceHttpDownCallback;
+import org.pdown.rest.entity.ServerConfigInfo;
 import org.pdown.rest.form.HttpRequestForm;
 import org.pdown.rest.form.TaskForm;
 import org.pdown.rest.util.ContentUtil;
@@ -37,7 +37,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
 
   @Override
   protected String savePath() {
-    return DownRestServer.getBaseDir() + File.separator + ".records.inf";
+    return ServerConfigInfo.baseDir + File.separator + ".records.inf";
   }
 
   @Override

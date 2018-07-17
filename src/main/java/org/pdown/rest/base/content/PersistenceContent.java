@@ -1,8 +1,8 @@
 package org.pdown.rest.base.content;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import org.pdown.rest.util.ContentUtil;
 import java.io.IOException;
+import org.pdown.rest.util.ContentUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

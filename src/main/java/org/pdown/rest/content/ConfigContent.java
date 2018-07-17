@@ -1,10 +1,9 @@
 package org.pdown.rest.content;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import org.pdown.rest.DownRestServer;
+import java.io.File;
 import org.pdown.rest.base.content.PersistenceContent;
 import org.pdown.rest.entity.ServerConfigInfo;
-import java.io.File;
 
 public class ConfigContent extends PersistenceContent<ServerConfigInfo, ConfigContent> {
 
@@ -22,7 +21,7 @@ public class ConfigContent extends PersistenceContent<ServerConfigInfo, ConfigCo
 
   @Override
   protected String savePath() {
-    return DownRestServer.getBaseDir() + File.separator + "config.inf";
+    return ServerConfigInfo.baseDir + File.separator + "config.inf";
   }
 
   @Override

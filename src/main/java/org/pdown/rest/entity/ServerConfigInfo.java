@@ -7,6 +7,9 @@ import org.pdown.core.proxy.ProxyConfig;
 public class ServerConfigInfo extends HttpDownConfigInfo implements Serializable {
 
   private static final long serialVersionUID = 8851967460594279184L;
+
+  public static transient String baseDir;
+
   /**
    * rest server port
    */

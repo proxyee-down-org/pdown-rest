@@ -8,11 +8,17 @@
   <artifactId>rest</artifactId>
   <version>1.0-SNAPSHOT</version>
 
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>2.0.2.RELEASE</version>
+    <relativePath/> <!-- lookup parent from repository -->
+  </parent>
+
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.target>1.8</maven.compiler.target>
     <maven.compiler.source>1.8</maven.compiler.source>
-    <spring.boot.version>2.0.2.RELEASE</spring.boot.version>
   </properties>
 
   <dependencies>
@@ -30,12 +36,10 @@
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
-      <version>${spring.boot.version}</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
-      <version>${spring.boot.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -47,7 +51,7 @@
         <directory>src/main/resources</directory>
         <excludes>
           <exclude>application.yml</exclude>
-          <exclude>logback-spring.xml</exclude>
+          <exclude>logback.xml</exclude>
         </excludes>
       </resource>
     </resources>
@@ -70,38 +74,24 @@
             <directory>src/main/resources</directory>
             <includes>
               <include>application.yml</include>
-              <include>logback-spring.xml</include>
+              <include>logback.xml</include>
             </includes>
           </resource>
         </resources>
         <finalName>pdown-rest</finalName>
         <plugins>
           <plugin>
-            <artifactId>maven-assembly-plugin</artifactId>
-            <configuration>
-              <appendAssemblyId>false</appendAssemblyId>
-              <descriptorRefs>
-                <descriptorRef>jar-with-dependencies</descriptorRef>
-              </descriptorRefs>
-              <archive>
-                <manifest>
-                  <mainClass>org.pdown.rest.DownRestServer</mainClass>
-                </manifest>
-              </archive>
-            </configuration>
-            <executions>
-              <execution>
-                <id>make-assembly</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>assembly</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-compiler-plugin</artifactId>
+            <configuration>
+              <compilerArguments>
+                <extdirs>${project.basedir}/.lib</extdirs>
+              </compilerArguments>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
           </plugin>
         </plugins>
       </build>

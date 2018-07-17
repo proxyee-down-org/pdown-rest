@@ -1,47 +1,23 @@
 package org.pdown.rest;
 
-import java.io.File;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
-import org.pdown.rest.content.ConfigContent;
-import org.pdown.rest.content.HttpDownContent;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class DownRestServer {
 
-  private static String baseDir = System.getProperty("user.dir");
-
-  public static String getBaseDir() {
-    return baseDir;
-  }
-
-  //init configuration
-  private static void init(String baseDir) {
-    String rootPath = System.getProperty("user.dir");
-    //设置slf4j日志打印目录
-    System.setProperty("LOG_PATH", rootPath);
-    if (baseDir != null) {
-      File dir = new File(baseDir);
-      if (!dir.exists() || dir.isFile()) {
-        dir.mkdir();
-      }
-      DownRestServer.baseDir = dir.getPath();
-    }
-    //org.pdown.rest.test.server config
-    ConfigContent.getInstance().load();
-    //download content
-    HttpDownContent.getInstance().load();
+  static {
+    System.setProperty("LOG_PATH", System.getProperty("user.dir"));
   }
 
   public static void start(String baseDir) {
-    init(baseDir);
-    SpringApplication.run(DownRestServer.class, new String[0]);
+    SpringApplication.run(DownRestServer.class, baseDir == null ? new String[0] : new String[]{baseDir});
   }
 
   public static void main(String[] args) {
@@ -62,5 +38,4 @@ public class DownRestServer {
       formatter.printHelp("Unrecognized option", options);
     }
   }
-
 }
