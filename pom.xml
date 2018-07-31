@@ -6,7 +6,7 @@
 
   <groupId>org.pdown</groupId>
   <artifactId>rest</artifactId>
-  <version>1.0-SNAPSHOT</version>
+  <version>1.0.1</version>
 
   <parent>
     <groupId>org.springframework.boot</groupId>
@@ -14,6 +14,30 @@
     <version>2.0.2.RELEASE</version>
     <relativePath/> <!-- lookup parent from repository -->
   </parent>
+
+  <name>pdown-rest</name>
+  <description>HTTP downloader RESTful server</description>
+  <url>https://github.com/proxyee-down-org/pdown-rest</url>
+
+  <licenses>
+    <license>
+      <name>Apache License, Version 2.0</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0</url>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <name>monkeyWie</name>
+      <email>liwei2633@163.com</email>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/proxyee-down-org/pdown-rest.git</connection>
+    <developerConnection>scm:git:https://github.com/proxyee-down-org/pdown-rest.git</developerConnection>
+    <url>https://github.com/proxyee-down-org/pdown-rest</url>
+  </scm>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -25,7 +49,7 @@
     <dependency>
       <groupId>org.pdown</groupId>
       <artifactId>core</artifactId>
-      <version>1.0-SNAPSHOT</version>
+      <version>1.0</version>
       <exclusions>
         <exclusion>
           <groupId>org.slf4j</groupId>
@@ -83,11 +107,6 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-compiler-plugin</artifactId>
-            <configuration>
-              <compilerArguments>
-                <extdirs>${project.basedir}/.lib</extdirs>
-              </compilerArguments>
-            </configuration>
           </plugin>
           <plugin>
             <groupId>org.springframework.boot</groupId>
@@ -95,6 +114,68 @@
           </plugin>
         </plugins>
       </build>
+    </profile>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <!--Compiler-->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-compiler-plugin</artifactId>
+          </plugin>
+          <!-- Source -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <!-- Javadoc -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <executions>
+              <execution>
+                <phase>package</phase>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <!-- GPG mvn clean deploy -P release -Dgpg.passphrase=YourPassphase-->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+      <distributionManagement>
+        <repository>
+          <id>releases</id>
+          <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+        </repository>
+        <snapshotRepository>
+          <id>snapshots</id>
+          <url>https://oss.sonatype.org/content/repositories/snapshots/</url>
+        </snapshotRepository>
+      </distributionManagement>
     </profile>
   </profiles>
 </project>

@@ -6,6 +6,7 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.pdown.rest.util.PathUtil;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -13,7 +14,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class DownRestServer {
 
   static {
-    System.setProperty("LOG_PATH", System.getProperty("user.dir"));
+    System.setProperty("LOG_PATH", PathUtil.ROOT_PATH);
   }
 
   public static void start(String baseDir) {
