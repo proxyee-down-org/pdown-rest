@@ -52,6 +52,8 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
   public void onDone(HttpDownBootstrap httpDownBootstrap) {
     calcSpeedLimit();
     HttpDownContent.getInstance().save();
+    //删除进度记录文件
+    HttpDownContent.getInstance().remove(httpDownBootstrap);
   }
 
   private void commonConfig(HttpDownBootstrap httpDownBootstrap) {

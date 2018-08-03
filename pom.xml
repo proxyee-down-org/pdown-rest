@@ -6,7 +6,7 @@
 
   <groupId>org.pdown</groupId>
   <artifactId>rest</artifactId>
-  <version>1.0.1</version>
+  <version>1.0.2-SNAPSHOT</version>
 
   <parent>
     <groupId>org.springframework.boot</groupId>
@@ -49,7 +49,7 @@
     <dependency>
       <groupId>org.pdown</groupId>
       <artifactId>core</artifactId>
-      <version>1.0</version>
+      <version>1.0.1-SNAPSHOT</version>
       <exclusions>
         <exclusion>
           <groupId>org.slf4j</groupId>

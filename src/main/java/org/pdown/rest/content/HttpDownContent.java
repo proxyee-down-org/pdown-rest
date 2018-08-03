@@ -9,10 +9,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.pdown.core.boot.HttpDownBootstrap;
 import org.pdown.core.constant.HttpDownStatus;
+import org.pdown.core.entity.ChunkInfo;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpRequestInfo;
 import org.pdown.core.entity.HttpResponseInfo;
 import org.pdown.core.entity.TaskInfo;
+import org.pdown.core.util.FileUtil;
 import org.pdown.core.util.HttpDownUtil;
 import org.pdown.rest.base.content.PersistenceContent;
 import org.pdown.rest.controller.PersistenceHttpDownCallback;
@@ -74,12 +76,30 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
           TaskForm taskForm = taskForms.get(i);
           HttpRequestInfo request = HttpDownUtil.buildGetRequest(taskForm.getRequest().getUrl(), taskForm.getRequest().getHeads(), taskForm.getRequest().getBody());
           TaskInfo taskInfo = null;
-          try {
-            taskInfo = ContentUtil.get(progressSavePath(taskForm.getConfig(), taskForm.getResponse()), TaskInfo.class);
-          } catch (Exception e) {
-          }
-          if (taskInfo != null && taskInfo.getStatus() != HttpDownStatus.DONE) {
-            taskInfo.setStatus(HttpDownStatus.PAUSE);
+          if (taskForm.getInfo().getStatus() == HttpDownStatus.DONE) {
+            taskInfo = taskForm.getInfo();
+          } else {
+            //读取任务下载进度
+            try {
+              taskInfo = ContentUtil.get(progressSavePath(taskForm.getConfig(), taskForm.getResponse()), TaskInfo.class);
+            } catch (Exception e) {
+            }
+            if (taskInfo.getStatus() != HttpDownStatus.DONE) {
+              //下载完了但是记录文件没更新到则标记为下载完成，并删除记录文件
+              if (taskInfo.getDownSize() >= taskForm.getResponse().getTotalSize()) {
+                taskInfo.setStatus(HttpDownStatus.DONE);
+                String progressPath = progressSavePath(taskForm.getConfig(), taskForm.getResponse());
+                FileUtil.deleteIfExists(progressPath);
+                FileUtil.deleteIfExists(ContentUtil.buildBakPath(progressPath));
+              } else if (taskInfo.getStatus() != HttpDownStatus.PAUSE) {
+                taskInfo.setStatus(HttpDownStatus.PAUSE);
+                //暂停时间计算
+                taskInfo.setLastPauseTime(System.currentTimeMillis());
+                for (ChunkInfo chunkInfo : taskInfo.getChunkInfoList()) {
+                  chunkInfo.setLastPauseTime(taskInfo.getLastPauseTime());
+                }
+              }
+            }
           }
           HttpDownBootstrap httpDownBootstrap = HttpDownBootstrap.builder()
               .request(request)
@@ -109,6 +129,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
         taskForm.setRequest(HttpRequestForm.parse(entry.getValue().getRequest()));
         taskForm.setResponse(entry.getValue().getResponse());
         taskForm.setConfig(entry.getValue().getDownConfig());
+        taskForm.setInfo(entry.getValue().getTaskInfo());
         return taskForm;
       }).collect(Collectors.toList());
       try {
@@ -122,7 +143,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
     return this;
   }
 
-  public String progressSavePath(HttpDownConfigInfo config,HttpResponseInfo response) {
+  public String progressSavePath(HttpDownConfigInfo config, HttpResponseInfo response) {
     return config.getFilePath() + File.separator + "." + response.getFileName() + ".inf";
   }
 
@@ -132,11 +153,26 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
       if (taskInfo != null) {
         try {
           synchronized (bootstrap) {
-            ContentUtil.save(taskInfo, progressSavePath(bootstrap.getDownConfig(),bootstrap.getResponse()), isHidden());
+            ContentUtil.save(taskInfo, progressSavePath(bootstrap.getDownConfig(), bootstrap.getResponse()), isHidden());
           }
         } catch (IOException e) {
           log("save progress error", e);
         }
+      }
+    }
+    return this;
+  }
+
+  public HttpDownContent remove(HttpDownBootstrap bootstrap) {
+    if (bootstrap != null) {
+      try {
+        String progressPath = progressSavePath(bootstrap.getDownConfig(), bootstrap.getResponse());
+        synchronized (bootstrap) {
+          FileUtil.deleteIfExists(progressPath);
+          FileUtil.deleteIfExists(ContentUtil.buildBakPath(progressPath));
+        }
+      } catch (IOException e) {
+        log("remove progress error", e);
       }
     }
     return this;

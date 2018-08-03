@@ -17,6 +17,13 @@ import org.pdown.core.boot.HttpDownBootstrapBuilder;
 import org.pdown.core.constant.HttpDownStatus;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpRequestInfo;
+import org.pdown.core.entity.TaskInfo;
+import org.pdown.core.exception.BootstrapCreateDirException;
+import org.pdown.core.exception.BootstrapException;
+import org.pdown.core.exception.BootstrapFileAlreadyExistsException;
+import org.pdown.core.exception.BootstrapNoPermissionException;
+import org.pdown.core.exception.BootstrapNoSpaceException;
+import org.pdown.core.exception.BootstrapPathEmptyException;
 import org.pdown.core.util.FileUtil;
 import org.pdown.core.util.HttpDownUtil;
 import org.pdown.rest.base.exception.NotFoundException;
@@ -66,8 +73,13 @@ public class TaskController {
     } else {
       bootstrapBuilder = HttpDownBootstrap.builder(createTaskForm.getRequest().getUrl(), createTaskForm.getRequest().getHeads(), createTaskForm.getRequest().getBody());
     }
+    //build a default taskInfo with WAIT status
+    TaskInfo taskInfo = new TaskInfo()
+        .setStatus(HttpDownStatus.WAIT)
+        .setStartTime(System.currentTimeMillis());
     HttpDownBootstrap httpDownBootstrap = bootstrapBuilder.response(createTaskForm.getResponse())
         .downConfig(buildConfig(createTaskForm.getConfig()))
+        .taskInfo(taskInfo)
         .callback(new PersistenceHttpDownCallback())
         .build();
     HttpDownContent downContent = HttpDownContent.getInstance();
@@ -77,7 +89,21 @@ public class TaskController {
           .filter(bootstrap -> bootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
           .count();
       if (runningCount < ConfigContent.getInstance().get().getTaskLimit()) {
-        httpDownBootstrap.start();
+        try {
+          httpDownBootstrap.start();
+        } catch (BootstrapException e) {
+          if (e instanceof BootstrapPathEmptyException) {
+            throw new ParameterException(4003, "Save path is empty");
+          } else if (e instanceof BootstrapCreateDirException) {
+            throw new ParameterException(4004, "Can't create dir");
+          } else if (e instanceof BootstrapNoPermissionException) {
+            throw new ParameterException(4005, "No permission");
+          } else if (e instanceof BootstrapNoSpaceException) {
+            throw new ParameterException(4006, "No space");
+          } else if (e instanceof BootstrapFileAlreadyExistsException) {
+            throw new ParameterException(4007, "File already exists");
+          }
+        }
       }
     }
     downContent.put(id, httpDownBootstrap).save();
