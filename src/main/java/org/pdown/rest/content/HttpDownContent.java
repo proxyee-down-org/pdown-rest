@@ -39,7 +39,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
 
   @Override
   protected String savePath() {
-    return ServerConfigInfo.baseDir + File.separator + ".records.inf";
+    return ServerConfigInfo.baseDir + File.separator + ".records.dat";
   }
 
   @Override
@@ -144,7 +144,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
   }
 
   public String progressSavePath(HttpDownConfigInfo config, HttpResponseInfo response) {
-    return config.getFilePath() + File.separator + "." + response.getFileName() + ".inf";
+    return config.getFilePath() + File.separator + "." + response.getFileName() + ".dat";
   }
 
   public HttpDownContent save(HttpDownBootstrap bootstrap) {

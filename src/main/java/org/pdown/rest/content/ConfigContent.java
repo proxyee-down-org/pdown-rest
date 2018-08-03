@@ -21,7 +21,7 @@ public class ConfigContent extends PersistenceContent<ServerConfigInfo, ConfigCo
 
   @Override
   protected String savePath() {
-    return ServerConfigInfo.baseDir + File.separator + "config.inf";
+    return ServerConfigInfo.baseDir + File.separator + "rest-server.cfg";
   }
 
   @Override
