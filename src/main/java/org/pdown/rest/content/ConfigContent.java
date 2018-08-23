@@ -26,6 +26,12 @@ public class ConfigContent extends PersistenceContent<ServerConfigInfo, ConfigCo
 
   @Override
   protected ServerConfigInfo defaultValue() {
-    return new ServerConfigInfo();
+    ServerConfigInfo serverConfigInfo = new ServerConfigInfo();
+    //Default values
+    serverConfigInfo.setTaskLimit(3);
+    serverConfigInfo.setConnections(32);
+    serverConfigInfo.setPort(26339);
+    serverConfigInfo.setTimeout(30);
+    return serverConfigInfo;
   }
 }
