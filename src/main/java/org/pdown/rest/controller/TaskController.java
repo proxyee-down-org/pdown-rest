@@ -121,14 +121,7 @@ public class TaskController {
         .entrySet()
         .stream()
         .sorted((e1, e2) -> (int) (e2.getValue().getTaskInfo().getStartTime() - e1.getValue().getTaskInfo().getStartTime()))
-        .map(entry -> {
-          TaskForm taskForm = new TaskForm();
-          taskForm.setId(entry.getKey());
-          taskForm.setRequest(HttpRequestForm.parse(entry.getValue().getRequest()));
-          taskForm.setConfig(entry.getValue().getDownConfig());
-          taskForm.setInfo(entry.getValue().getTaskInfo());
-          return taskForm;
-        })
+        .map(entry -> TaskForm.parse(entry))
         .collect(Collectors.toList());
     return ResponseEntity.ok(list);
   }
@@ -147,24 +140,27 @@ public class TaskController {
     return ResponseEntity.ok(taskForm);
   }
 
-  @DeleteMapping("tasks/{id}")
-  public ResponseEntity delete(@PathVariable String id, @RequestParam(required = false) boolean delFile)
+  @DeleteMapping("tasks/{ids}")
+  public ResponseEntity delete(@PathVariable String ids, @RequestParam(required = false) boolean delFile)
       throws IOException {
-    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
-    if (bootstrap == null) {
-      throw new NotFoundException("task does not exist");
-    }
-    bootstrap.close();
     HttpDownContent httpDownContent = HttpDownContent.getInstance();
-    //Delete download progress record file
-    String recordFile = httpDownContent.progressSavePath(bootstrap.getDownConfig(), bootstrap.getResponse());
-    FileUtil.deleteIfExists(recordFile);
-    FileUtil.deleteIfExists(ContentUtil.buildBakPath(recordFile));
-    if (delFile) {
-      //Delete download file
-      FileUtil.deleteIfExists(HttpDownUtil.getTaskFilePath(bootstrap));
+    for (String id : ids.split(",")) {
+      HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
+      if (bootstrap == null) {
+        continue;
+      }
+      bootstrap.close();
+      //Delete download progress record file
+      String recordFile = httpDownContent.progressSavePath(bootstrap.getDownConfig(), bootstrap.getResponse());
+      FileUtil.deleteIfExists(recordFile);
+      FileUtil.deleteIfExists(ContentUtil.buildBakPath(recordFile));
+      if (delFile) {
+        //Delete download file
+        FileUtil.deleteIfExists(HttpDownUtil.getTaskFilePath(bootstrap));
+      }
+      httpDownContent.remove(id);
     }
-    httpDownContent.remove(id).save();
+    httpDownContent.save();
     return ResponseEntity.ok(null);
   }
 
@@ -178,13 +174,15 @@ public class TaskController {
     return ResponseEntity.ok(null);
   }
 
-  @PutMapping("tasks/{id}/pause")
-  public ResponseEntity pauseDown(@PathVariable String id) {
-    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
-    if (bootstrap == null) {
-      throw new NotFoundException("task does not exist");
+  @PutMapping("tasks/{ids}/pause")
+  public ResponseEntity pauseDown(@PathVariable String ids) {
+    for (String id : ids.split(",")) {
+      HttpDownBootstrap httpDownBootstrap = HttpDownContent.getInstance().get(id);
+      if (httpDownBootstrap == null) {
+        continue;
+      }
+      HttpDownContent.getInstance().get(id).pause();
     }
-    HttpDownContent.getInstance().get(id).pause();
     return ResponseEntity.ok(null);
   }
 
@@ -199,46 +197,14 @@ public class TaskController {
     return ResponseEntity.ok(null);
   }
 
-  @PutMapping("tasks/{id}/resume")
-  public ResponseEntity resume(@PathVariable String id) {
-    ResumeVo resumeVo = new ResumeVo();
-    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
-    if (bootstrap == null) {
-      throw new NotFoundException("task does not exist");
-    }
-    resumeVo.setResumeIds(Arrays.asList(new String[]{id}));
-    if (HttpDownContent.getInstance().get(id).getTaskInfo().getStatus() == HttpDownStatus.PAUSE) {
-      resumeVo.setPauseIds(handleResume(1));
-      HttpDownContent.getInstance().get(id).resume();
-    }
-    return ResponseEntity.ok(resumeVo);
+  @PutMapping("tasks/{ids}/resume")
+  public ResponseEntity resume(@PathVariable String ids) {
+    return ResponseEntity.ok(handleResume(Arrays.asList(ids.split(","))));
   }
 
   @PutMapping("tasks/resume")
   public ResponseEntity resumeAll() {
-    ResumeVo resumeVo = new ResumeVo();
-    resumeVo.setPauseIds(handleResume(0));
-    int runCount = (int) HttpDownContent.getInstance().get()
-        .entrySet()
-        .stream()
-        .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
-        .count();
-    int needResumeCount = ConfigContent.getInstance().get().getTaskLimit() - runCount;
-    if (needResumeCount > 0) {
-      List<String> resumeIds = new ArrayList<>();
-      HttpDownContent.getInstance().get()
-          .entrySet()
-          .stream()
-          .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.PAUSE)
-          .sorted(Comparator.comparingLong(entry -> entry.getValue().getTaskInfo().getStartTime()))
-          .limit(needResumeCount)
-          .forEach(entry -> {
-            entry.getValue().resume();
-            resumeIds.add(entry.getKey());
-          });
-      resumeVo.setResumeIds(resumeIds);
-    }
-    return ResponseEntity.ok(resumeVo);
+    return ResponseEntity.ok(handleResume(null));
   }
 
   @GetMapping("tasks/progress")
@@ -256,22 +222,55 @@ public class TaskController {
   }
 
   //Pause running task
-  private List<String> handleResume(int resumeCount) {
-    List<String> list = new ArrayList<>();
-    List<Entry<String, HttpDownBootstrap>> runList = HttpDownContent.getInstance().get()
-        .entrySet()
-        .stream()
-        .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
-        .collect(Collectors.toList());
-    int needPauseCount = runList.size() + resumeCount - ConfigContent.getInstance().get().getTaskLimit();
-    if (needPauseCount > 0) {
-      for (int i = 0; i < needPauseCount; i++) {
-        Entry<String, HttpDownBootstrap> entry = runList.get(i);
-        entry.getValue().pause();
-        list.add(entry.getKey());
+  private ResumeVo handleResume(List<String> resumeIds) {
+    ResumeVo resumeVo = new ResumeVo();
+    List<Entry<String, HttpDownBootstrap>> runList = new ArrayList<>();
+    List<Entry<String, HttpDownBootstrap>> waitList = new ArrayList<>();
+    for (Entry<String, HttpDownBootstrap> entry : HttpDownContent.getInstance().get().entrySet()) {
+      HttpDownBootstrap httpDownBootstrap = entry.getValue();
+      int status = httpDownBootstrap.getTaskInfo().getStatus();
+      if (status == HttpDownStatus.RUNNING) {
+        runList.add(entry);
+      } else if (status != HttpDownStatus.DONE) {
+        waitList.add(entry);
       }
     }
-    return list;
+
+    List<String> needResumeIds = new ArrayList<>();
+    List<String> needPauseIds = new ArrayList<>();
+    int taskLimit = ConfigContent.getInstance().get().getTaskLimit();
+    if (resumeIds == null || resumeIds.size() == 0) {
+      int needResumeCount = taskLimit - runList.size();
+      if (needResumeCount > 0) {
+        needResumeIds = waitList.stream()
+            .limit(needResumeCount)
+            .map(entry -> entry.getKey())
+            .collect(Collectors.toList());
+      }
+    } else {
+      needResumeIds = resumeIds.stream()
+          .filter(id -> waitList.stream().anyMatch(entry -> id.equals(entry.getKey())))
+          .limit(taskLimit)
+          .collect(Collectors.toList());
+    }
+    resumeVo.setResumeIds(needResumeIds);
+    resumeVo.setPauseIds(needPauseIds);
+    if (needResumeIds.size() > 0) {
+      int needPauseCount = runList.size() + needResumeIds.size() - taskLimit;
+      if (needPauseCount > 0) {
+        for (int i = 0; i < needPauseCount; i++) {
+          Entry<String, HttpDownBootstrap> entry = runList.get(i);
+          needPauseIds.add(entry.getKey());
+          entry.getValue().pause();
+        }
+      }
+      for (Entry<String, HttpDownBootstrap> entry : waitList) {
+        if (needResumeIds.contains(entry.getKey())) {
+          entry.getValue().resume();
+        }
+      }
+    }
+    return resumeVo;
   }
 
   private HttpDownConfigInfo buildConfig(HttpDownConfigInfo configForm) {

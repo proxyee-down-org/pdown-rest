@@ -13,11 +13,11 @@ public class ServerConfigInfo extends HttpDownConfigInfo implements Serializable
   /**
    * rest server port
    */
-  private long port;
+  private int port;
   /**
    * Concurrent task downloads
    */
-  private int taskLimit = 3;
+  private int taskLimit;
   /**
    * Total speed limit,default 0B/S
    */
@@ -27,11 +27,11 @@ public class ServerConfigInfo extends HttpDownConfigInfo implements Serializable
    */
   private ProxyConfig proxyConfig;
 
-  public long getPort() {
+  public int getPort() {
     return port;
   }
 
-  public void setPort(long port) {
+  public void setPort(int port) {
     this.port = port;
   }
 

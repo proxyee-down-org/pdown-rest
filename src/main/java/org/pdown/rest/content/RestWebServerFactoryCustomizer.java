@@ -3,14 +3,14 @@ package org.pdown.rest.content;
 import java.io.File;
 import org.pdown.rest.entity.ServerConfigInfo;
 import org.pdown.rest.util.PathUtil;
-import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+import org.springframework.boot.web.servlet.server.ConfigurableServletWebServerFactory;
 import org.springframework.stereotype.Component;
 
 @Component
-public class ContentCommandLineRunner implements CommandLineRunner {
+public class RestWebServerFactoryCustomizer implements WebServerFactoryCustomizer<ConfigurableServletWebServerFactory> {
 
-  @Override
-  public void run(String... args) throws Exception {
+  public static void init(String... args){
     String baseDir = args != null && args.length > 0 ? args[0] : null;
     String rootPath = PathUtil.ROOT_PATH;
     if (baseDir != null) {
@@ -26,5 +26,11 @@ public class ContentCommandLineRunner implements CommandLineRunner {
     ConfigContent.getInstance().load();
     //download content
     HttpDownContent.getInstance().load();
+  }
+
+
+  @Override
+  public void customize(ConfigurableServletWebServerFactory factory) {
+    factory.setPort(ConfigContent.getInstance().get().getPort());
   }
 }

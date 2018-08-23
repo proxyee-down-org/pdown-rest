@@ -6,6 +6,7 @@ import org.apache.commons.cli.DefaultParser;
 import org.apache.commons.cli.HelpFormatter;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.pdown.rest.content.RestWebServerFactoryCustomizer;
 import org.pdown.rest.util.PathUtil;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -14,11 +15,13 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class DownRestServer {
 
   static {
-    System.setProperty("LOG_PATH", PathUtil.ROOT_PATH);
+    System.setProperty("ROOT_PATH", PathUtil.ROOT_PATH);
   }
 
-  public static void start(String baseDir) {
-    SpringApplication.run(DownRestServer.class, baseDir == null ? new String[0] : new String[]{baseDir});
+  public static void start(String baseDir) throws Exception {
+    String[] args = baseDir == null ? new String[0] : new String[]{baseDir};
+    RestWebServerFactoryCustomizer.init(args);
+    SpringApplication.run(DownRestServer.class, args);
   }
 
   public static void main(String[] args) {
@@ -37,6 +40,8 @@ public class DownRestServer {
       start(cl.getOptionValue("b"));
     } catch (ParseException e) {
       formatter.printHelp("Unrecognized option", options);
+    } catch (Exception e) {
+      e.printStackTrace();
     }
   }
 }
