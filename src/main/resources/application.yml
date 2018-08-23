@@ -1,4 +1,2 @@
-server:
-  port: 26339
 logging:
   file: classpath:logback.xml

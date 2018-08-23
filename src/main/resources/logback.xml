@@ -3,7 +3,7 @@
   <appender name="FILE"
     class="ch.qos.logback.core.rolling.RollingFileAppender">
     <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-      <fileNamePattern>${LOG_PATH}/log/error.%d{yyyy-MM-dd}.log</fileNamePattern>
+      <fileNamePattern>${ROOT_PATH}/log/rest-error.%d{yyyy-MM-dd}.log</fileNamePattern>
       <maxHistory>7</maxHistory>
     </rollingPolicy>
     <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
