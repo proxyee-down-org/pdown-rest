@@ -76,7 +76,8 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
           TaskForm taskForm = taskForms.get(i);
           HttpRequestInfo request = HttpDownUtil.buildGetRequest(taskForm.getRequest().getUrl(), taskForm.getRequest().getHeads(), taskForm.getRequest().getBody());
           TaskInfo taskInfo = null;
-          if (taskForm.getInfo().getStatus() == HttpDownStatus.DONE) {
+          if (taskForm.getInfo().getStatus() == HttpDownStatus.WAIT
+              || taskForm.getInfo().getStatus() == HttpDownStatus.DONE) {
             taskInfo = taskForm.getInfo();
           } else {
             //读取任务下载进度
@@ -84,7 +85,12 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
               taskInfo = ContentUtil.get(progressSavePath(taskForm.getConfig(), taskForm.getResponse()), TaskInfo.class);
             } catch (Exception e) {
             }
-            if (taskInfo.getStatus() != HttpDownStatus.DONE) {
+            if (taskInfo == null) {
+              taskInfo = taskForm.getInfo();
+              taskInfo.setStatus(HttpDownStatus.WAIT);
+            }
+            if (taskForm.getInfo().getStatus() != HttpDownStatus.WAIT
+                && taskInfo.getStatus() != HttpDownStatus.DONE) {
               //下载完了但是记录文件没更新到则标记为下载完成，并删除记录文件
               if (taskInfo.getDownSize() >= taskForm.getResponse().getTotalSize()) {
                 taskInfo.setStatus(HttpDownStatus.DONE);
@@ -123,15 +129,9 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
   @Override
   public HttpDownContent save() {
     if (content.size() > 0) {
-      List<TaskForm> taskForms = content.entrySet().stream().map(entry -> {
-        TaskForm taskForm = new TaskForm();
-        taskForm.setId(entry.getKey());
-        taskForm.setRequest(HttpRequestForm.parse(entry.getValue().getRequest()));
-        taskForm.setResponse(entry.getValue().getResponse());
-        taskForm.setConfig(entry.getValue().getDownConfig());
-        taskForm.setInfo(entry.getValue().getTaskInfo());
-        return taskForm;
-      }).collect(Collectors.toList());
+      List<TaskForm> taskForms = content.entrySet().stream()
+          .map(entry -> TaskForm.parse(entry))
+          .collect(Collectors.toList());
       try {
         synchronized (content) {
           ContentUtil.save(taskForms, savePath(), isHidden());
