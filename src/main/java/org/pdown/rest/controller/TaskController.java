@@ -107,6 +107,7 @@ public class TaskController {
       }
     }
     downContent.put(id, httpDownBootstrap).save();
+    PersistenceHttpDownCallback.calcSpeedLimit();
     TaskForm taskForm = new TaskForm();
     taskForm.setId(id);
     taskForm.setRequest(HttpRequestForm.parse(httpDownBootstrap.getRequest()));
@@ -116,10 +117,17 @@ public class TaskController {
   }
 
   @GetMapping("tasks")
-  public ResponseEntity list() {
+  public ResponseEntity list(@RequestParam(required = false) Integer status) {
     List<TaskForm> list = HttpDownContent.getInstance().get()
         .entrySet()
         .stream()
+        .filter(entry -> {
+          if (status == null) {
+            return true;
+          } else {
+            return entry.getValue().getTaskInfo().getStatus() == status;
+          }
+        })
         .sorted((e1, e2) -> (int) (e2.getValue().getTaskInfo().getStartTime() - e1.getValue().getTaskInfo().getStartTime()))
         .map(entry -> TaskForm.parse(entry))
         .collect(Collectors.toList());

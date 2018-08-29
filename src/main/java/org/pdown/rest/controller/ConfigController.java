@@ -29,7 +29,12 @@ public class ConfigController {
   public ResponseEntity setConfig(@RequestBody ServerConfigInfo serverConfigInfo) {
     ServerConfigInfo beforeConfig = ConfigContent.getInstance().get();
     if (beforeConfig != null) {
+      boolean speedChange = beforeConfig.getSpeedLimit() != serverConfigInfo.getSpeedLimit()
+          || beforeConfig.getTotalSpeedLimit() != serverConfigInfo.getTotalSpeedLimit();
       BeanUtils.copyProperties(serverConfigInfo, ConfigContent.getInstance().get());
+      if(speedChange){
+        PersistenceHttpDownCallback.calcSpeedLimit();
+      }
     }
     ConfigContent.getInstance().save();
     return ResponseEntity.ok(null);

@@ -15,8 +15,8 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
 
   @Override
   public void onStart(HttpDownBootstrap httpDownBootstrap) {
-    commonConfig(httpDownBootstrap);
     calcSpeedLimit();
+    commonConfig(httpDownBootstrap);
   }
 
   @Override
@@ -54,6 +54,15 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
     HttpDownContent.getInstance().save();
     //删除进度记录文件
     HttpDownContent.getInstance().remove(httpDownBootstrap);
+    //开始一个待下载的任务
+    HttpDownBootstrap waitBootstrap = HttpDownContent.getInstance().get().values()
+        .stream()
+        .filter(bootstrap -> bootstrap.getTaskInfo().getStatus() == HttpDownStatus.WAIT)
+        .findFirst()
+        .orElse(null);
+    if (waitBootstrap != null) {
+      waitBootstrap.resume();
+    }
   }
 
   private void commonConfig(HttpDownBootstrap httpDownBootstrap) {
@@ -68,21 +77,38 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
     }
   }
 
-  private void calcSpeedLimit() {
+  public static void calcSpeedLimit() {
     ServerConfigInfo serverConfigInfo = ConfigContent.getInstance().get();
     long totalSpeedLimit = serverConfigInfo.getTotalSpeedLimit();
-    if (totalSpeedLimit >= 0) {
-      List<HttpDownBootstrap> runList = HttpDownContent.getInstance().get()
-          .values()
-          .stream()
-          .filter(bootstrap -> HttpDownStatus.RUNNING == bootstrap.getTaskInfo().getStatus())
-          .collect(Collectors.toList());
-      if (runList.size() > 0) {
+    long speedLimit = serverConfigInfo.getSpeedLimit();
+    List<HttpDownBootstrap> runList = HttpDownContent.getInstance().get()
+        .values()
+        .stream()
+        .filter(bootstrap -> HttpDownStatus.RUNNING == bootstrap.getTaskInfo().getStatus())
+        .collect(Collectors.toList());
+    if (runList.size() > 0) {
+      if (totalSpeedLimit > 0) {
         long avgSpeedLimit = (long) (totalSpeedLimit / (double) runList.size());
         for (HttpDownBootstrap bootstrap : runList) {
           bootstrap.getDownConfig().setSpeedLimit(avgSpeedLimit);
+          refreshLast(bootstrap);
+        }
+      } else if (speedLimit > 0) {
+        for (HttpDownBootstrap bootstrap : runList) {
+          bootstrap.getDownConfig().setSpeedLimit(speedLimit);
+          refreshLast(bootstrap);
+        }
+      } else {
+        for (HttpDownBootstrap bootstrap : runList) {
+          bootstrap.getDownConfig().setSpeedLimit(0);
         }
       }
     }
+  }
+
+  //刷新最后下载时间和最后下载的字节数，用于计算下载速度限制
+  private static void refreshLast(HttpDownBootstrap bootstrap) {
+    bootstrap.getTaskInfo().setLastStartTime(0);
+    bootstrap.getTaskInfo().setLastDownSize(bootstrap.getTaskInfo().getDownSize());
   }
 }
