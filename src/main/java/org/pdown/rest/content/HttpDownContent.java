@@ -128,7 +128,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
 
   @Override
   public HttpDownContent save() {
-    if (content.size() > 0) {
+    if (content != null) {
       List<TaskForm> taskForms = content.entrySet().stream()
           .map(entry -> TaskForm.parse(entry))
           .collect(Collectors.toList());

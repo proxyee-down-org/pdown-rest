@@ -283,6 +283,9 @@ public class TaskController {
 
   private HttpDownConfigInfo buildConfig(HttpDownConfigInfo configForm) {
     ServerConfigInfo serverConfigInfo = ConfigContent.getInstance().get();
+    if (StringUtils.isEmpty(configForm.getFilePath())) {
+      configForm.setFilePath(serverConfigInfo.getFilePath());
+    }
     if (configForm.getConnections() <= 0) {
       configForm.setConnections(serverConfigInfo.getConnections());
     }
