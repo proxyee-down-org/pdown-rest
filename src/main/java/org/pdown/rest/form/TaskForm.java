@@ -54,13 +54,13 @@ public class TaskForm {
     this.info = info;
   }
 
-  public static TaskForm parse(Entry<String,HttpDownBootstrap> entry){
+  public static TaskForm parse(String id, HttpDownBootstrap bootstrap) {
     TaskForm taskForm = new TaskForm();
-    taskForm.setId(entry.getKey());
-    taskForm.setRequest(HttpRequestForm.parse(entry.getValue().getRequest()));
-    taskForm.setResponse(entry.getValue().getResponse());
-    taskForm.setConfig(entry.getValue().getDownConfig());
-    taskForm.setInfo(entry.getValue().getTaskInfo());
+    taskForm.setId(id);
+    taskForm.setRequest(HttpRequestForm.parse(bootstrap.getRequest()));
+    taskForm.setResponse(bootstrap.getResponse());
+    taskForm.setConfig(bootstrap.getDownConfig());
+    taskForm.setInfo(bootstrap.getTaskInfo());
     return taskForm;
   }
 }

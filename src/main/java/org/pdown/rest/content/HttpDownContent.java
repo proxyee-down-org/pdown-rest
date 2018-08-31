@@ -19,7 +19,6 @@ import org.pdown.core.util.HttpDownUtil;
 import org.pdown.rest.base.content.PersistenceContent;
 import org.pdown.rest.controller.PersistenceHttpDownCallback;
 import org.pdown.rest.entity.ServerConfigInfo;
-import org.pdown.rest.form.HttpRequestForm;
 import org.pdown.rest.form.TaskForm;
 import org.pdown.rest.util.ContentUtil;
 
@@ -130,7 +129,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
   public HttpDownContent save() {
     if (content != null) {
       List<TaskForm> taskForms = content.entrySet().stream()
-          .map(entry -> TaskForm.parse(entry))
+          .map(entry -> TaskForm.parse(entry.getKey(),entry.getValue()))
           .collect(Collectors.toList());
       try {
         synchronized (content) {

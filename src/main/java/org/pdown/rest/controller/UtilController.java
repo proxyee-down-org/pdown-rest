@@ -9,6 +9,7 @@ import org.pdown.core.exception.BootstrapResolveException;
 import org.pdown.core.util.HttpDownUtil;
 import org.pdown.rest.base.exception.ParameterException;
 import org.pdown.rest.form.HttpRequestForm;
+import org.pdown.rest.form.ResolveForm;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -35,7 +36,8 @@ public class UtilController {
       loopGroup = new NioEventLoopGroup(1);
       try {
         HttpResponseInfo httpResponseInfo = HttpDownUtil.getHttpResponseInfo(httpRequestInfo, null, null, loopGroup);
-        return ResponseEntity.ok(httpResponseInfo);
+        ResolveForm resolveForm = new ResolveForm(HttpRequestForm.parse(httpRequestInfo), httpResponseInfo);
+        return ResponseEntity.ok(resolveForm);
       } catch (BootstrapResolveException exception) {
         throw new ParameterException(4002, exception.getMessage());
       }

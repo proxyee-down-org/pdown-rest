@@ -5,7 +5,6 @@ import io.netty.util.internal.StringUtil;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -129,7 +128,7 @@ public class TaskController {
           }
         })
         .sorted((e1, e2) -> (int) (e2.getValue().getTaskInfo().getStartTime() - e1.getValue().getTaskInfo().getStartTime()))
-        .map(entry -> TaskForm.parse(entry))
+        .map(entry -> TaskForm.parse(entry.getKey(), entry.getValue()))
         .collect(Collectors.toList());
     return ResponseEntity.ok(list);
   }
@@ -140,12 +139,7 @@ public class TaskController {
     if (bootstrap == null) {
       throw new NotFoundException("task does not exist");
     }
-    TaskForm taskForm = new TaskForm();
-    taskForm.setId(id);
-    taskForm.setRequest(HttpRequestForm.parse(bootstrap.getRequest()));
-    taskForm.setConfig(bootstrap.getDownConfig());
-    taskForm.setInfo(bootstrap.getTaskInfo());
-    return ResponseEntity.ok(taskForm);
+    return ResponseEntity.ok(TaskForm.parse(id, bootstrap));
   }
 
   @DeleteMapping("tasks/{ids}")
@@ -220,12 +214,15 @@ public class TaskController {
     if (ids == null || ids.length == 0) {
       throw new NotFoundException("tasks progress does not exist");
     }
-    List<TaskForm> list = Arrays.stream(ids).map(id -> {
-      TaskForm taskForm = new TaskForm();
-      taskForm.setId(id);
-      taskForm.setInfo(HttpDownContent.getInstance().get(id).getTaskInfo());
-      return taskForm;
-    }).collect(Collectors.toList());
+    List<TaskForm> list = Arrays.stream(ids)
+        .filter(id -> HttpDownContent.getInstance().get(id) != null)
+        .map(id -> {
+          TaskForm taskForm = new TaskForm();
+          taskForm.setId(id);
+          taskForm.setInfo(HttpDownContent.getInstance().get(id).getTaskInfo());
+          return taskForm;
+        })
+        .collect(Collectors.toList());
     return ResponseEntity.ok(list);
   }
 
