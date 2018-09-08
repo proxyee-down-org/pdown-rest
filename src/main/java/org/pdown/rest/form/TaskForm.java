@@ -1,6 +1,5 @@
 package org.pdown.rest.form;
 
-import java.util.Map.Entry;
 import org.pdown.core.boot.HttpDownBootstrap;
 import org.pdown.core.entity.HttpDownConfigInfo;
 import org.pdown.core.entity.HttpResponseInfo;

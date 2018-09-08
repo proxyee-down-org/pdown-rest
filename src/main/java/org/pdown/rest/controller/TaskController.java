@@ -116,18 +116,30 @@ public class TaskController {
   }
 
   @GetMapping("tasks")
-  public ResponseEntity list(@RequestParam(required = false) Integer status) {
+  public ResponseEntity list(@RequestParam(required = false, name = "status") String statuses) {
     List<TaskForm> list = HttpDownContent.getInstance().get()
         .entrySet()
         .stream()
         .filter(entry -> {
-          if (status == null) {
+          if (StringUtils.isEmpty(statuses)) {
             return true;
           } else {
-            return entry.getValue().getTaskInfo().getStatus() == status;
+            return Arrays.stream(statuses.split(",")).anyMatch(status -> status.equals(entry.getValue().getTaskInfo().getStatus() + ""));
           }
         })
-        .sorted((e1, e2) -> (int) (e2.getValue().getTaskInfo().getStartTime() - e1.getValue().getTaskInfo().getStartTime()))
+        .sorted((e1, e2) -> {
+          TaskInfo t1 = e1.getValue().getTaskInfo();
+          TaskInfo t2 = e2.getValue().getTaskInfo();
+          if (t1.getStatus() == HttpDownStatus.RUNNING
+              && t2.getStatus() != HttpDownStatus.RUNNING) {
+            return 1;
+          } else if (t2.getStatus() == HttpDownStatus.RUNNING
+              && t1.getStatus() != HttpDownStatus.RUNNING) {
+            return -1;
+          } else {
+            return (int) (t1.getStartTime() - t2.getStartTime());
+          }
+        })
         .map(entry -> TaskForm.parse(entry.getKey(), entry.getValue()))
         .collect(Collectors.toList());
     return ResponseEntity.ok(list);
@@ -140,6 +152,27 @@ public class TaskController {
       throw new NotFoundException("task does not exist");
     }
     return ResponseEntity.ok(TaskForm.parse(id, bootstrap));
+  }
+
+  @PutMapping("tasks/{id}")
+  public ResponseEntity refresh(@PathVariable String id, HttpServletRequest request) throws IOException {
+    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
+    ObjectMapper mapper = new ObjectMapper();
+    HttpRequestForm requestForm = mapper.readValue(request.getInputStream(), HttpRequestForm.class);
+    if (bootstrap == null) {
+      throw new NotFoundException("task does not exist");
+    }
+    boolean pauseFlag = false;
+    if (bootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING) {
+      bootstrap.pause();
+      pauseFlag = true;
+    }
+    bootstrap.setRequest(HttpDownUtil.buildGetRequest(requestForm.getUrl(), requestForm.getHeads(), requestForm.getBody()));
+    HttpDownContent.getInstance().save();
+    if (pauseFlag) {
+      handleResume(Arrays.asList(id));
+    }
+    return ResponseEntity.ok(null);
   }
 
   @DeleteMapping("tasks/{ids}")
@@ -227,6 +260,7 @@ public class TaskController {
   }
 
   //Pause running task
+
   private ResumeVo handleResume(List<String> resumeIds) {
     ResumeVo resumeVo = new ResumeVo();
     List<Entry<String, HttpDownBootstrap>> runList = new ArrayList<>();

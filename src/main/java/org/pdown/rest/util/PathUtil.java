@@ -19,8 +19,10 @@ public class PathUtil {
     try {
       URLConnection connection = url.openConnection();
       if (connection instanceof JarURLConnection) {
-//        ROOT_PATH = System.getProperty("user.dir");
-        ROOT_PATH = new File(System.getProperty("java.class.path")).getAbsoluteFile().getParent();
+        File userDir = new File(System.getProperty("user.dir"));
+        File classPathDir = new File(System.getProperty("java.class.path")).getAbsoluteFile().getParentFile();
+        ROOT_PATH = userDir.getAbsolutePath().length() > classPathDir.getAbsolutePath().length() ?
+            userDir.getAbsolutePath() : classPathDir.getAbsolutePath();
       }
     } catch (Exception e) {
     }
