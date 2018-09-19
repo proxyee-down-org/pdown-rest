@@ -6,6 +6,7 @@ import org.pdown.core.entity.HttpRequestInfo;
 
 public class HttpRequestForm {
 
+  private String method;
   private String url;
   private Map<String, String> heads;
   private String body;
@@ -13,10 +14,23 @@ public class HttpRequestForm {
   public HttpRequestForm() {
   }
 
-  public HttpRequestForm(String url, Map<String, String> heads, String body) {
+  public HttpRequestForm(String method, String url, Map<String, String> heads, String body) {
+    this.method = method;
     this.url = url;
     this.heads = heads;
     this.body = body;
+  }
+
+  public HttpRequestForm(String url, Map<String, String> heads, String body) {
+    this("GET", url, heads, body);
+  }
+
+  public String getMethod() {
+    return method;
+  }
+
+  public void setMethod(String method) {
+    this.method = method;
   }
 
   public String getUrl() {
@@ -52,6 +66,7 @@ public class HttpRequestForm {
       url = (httpRequest.requestProto().getSsl() ? "https://" : "http://") + url;
     }
     HttpHeadsInfo httpHeadsInfo = (HttpHeadsInfo) httpRequest.headers();
+    form.setMethod(httpRequest.method().name());
     form.setUrl(url);
     form.setHeads(httpHeadsInfo.toMap());
     if (httpRequest.content() != null) {

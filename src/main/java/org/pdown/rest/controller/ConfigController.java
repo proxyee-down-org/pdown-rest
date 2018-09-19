@@ -1,6 +1,8 @@
 package org.pdown.rest.controller;
 
+import org.pdown.core.constant.HttpDownStatus;
 import org.pdown.rest.content.ConfigContent;
+import org.pdown.rest.content.HttpDownContent;
 import org.pdown.rest.entity.ServerConfigInfo;
 import org.springframework.beans.BeanUtils;
 import org.springframework.http.ResponseEntity;
@@ -32,10 +34,13 @@ public class ConfigController {
       boolean speedChange = beforeConfig.getSpeedLimit() != serverConfigInfo.getSpeedLimit()
           || beforeConfig.getTotalSpeedLimit() != serverConfigInfo.getTotalSpeedLimit();
       BeanUtils.copyProperties(serverConfigInfo, ConfigContent.getInstance().get());
-      if(speedChange){
+      if (speedChange) {
         PersistenceHttpDownCallback.calcSpeedLimit();
       }
     }
+    HttpDownContent.getInstance().get().values().stream()
+        .filter(bootstrap -> bootstrap.getTaskInfo().getStatus() != HttpDownStatus.DONE)
+        .forEach(bootstrap -> bootstrap.setProxyConfig(serverConfigInfo.getProxyConfig()));
     ConfigContent.getInstance().save();
     return ResponseEntity.ok(null);
   }

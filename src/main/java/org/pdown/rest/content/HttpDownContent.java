@@ -73,7 +73,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
         content = defaultValue();
         for (int i = 0; i < taskForms.size(); i++) {
           TaskForm taskForm = taskForms.get(i);
-          HttpRequestInfo request = HttpDownUtil.buildGetRequest(taskForm.getRequest().getUrl(), taskForm.getRequest().getHeads(), taskForm.getRequest().getBody());
+          HttpRequestInfo request = HttpDownUtil.buildRequest(taskForm.getRequest().getMethod(), taskForm.getRequest().getUrl(), taskForm.getRequest().getHeads(), taskForm.getRequest().getBody());
           TaskInfo taskInfo = null;
           if (taskForm.getInfo().getStatus() == HttpDownStatus.WAIT
               || taskForm.getInfo().getStatus() == HttpDownStatus.DONE) {
@@ -129,7 +129,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
   public HttpDownContent save() {
     if (content != null) {
       List<TaskForm> taskForms = content.entrySet().stream()
-          .map(entry -> TaskForm.parse(entry.getKey(),entry.getValue()))
+          .map(entry -> TaskForm.parse(entry.getKey(), entry.getValue()))
           .collect(Collectors.toList());
       try {
         synchronized (content) {

@@ -62,15 +62,16 @@ public class TaskController {
     if (StringUtils.isEmpty(createTaskForm.getRequest().getUrl())) {
       throw new ParameterException(4002, "URL can't be empty");
     }
+    HttpRequestForm requestForm = createTaskForm.getRequest();
     HttpDownBootstrapBuilder bootstrapBuilder;
-    //if know response Content-Length and file name,can create a task directly, without spending a request to resolve the task name and size.
+    //If know response Content-Length and file name,can create a task directly, without spending a request to resolve the task name and size.
     if (createTaskForm.getResponse() != null
         && createTaskForm.getResponse().getTotalSize() > 0
         && !StringUtil.isNullOrEmpty(createTaskForm.getResponse().getFileName())) {
-      HttpRequestInfo httpRequestInfo = HttpDownUtil.buildGetRequest(createTaskForm.getRequest().getUrl(), createTaskForm.getRequest().getHeads(), createTaskForm.getRequest().getBody());
+      HttpRequestInfo httpRequestInfo = HttpDownUtil.buildRequest(requestForm.getMethod(), requestForm.getUrl(), requestForm.getHeads(), requestForm.getBody());
       bootstrapBuilder = HttpDownBootstrap.builder().request(httpRequestInfo);
     } else {
-      bootstrapBuilder = HttpDownBootstrap.builder(createTaskForm.getRequest().getUrl(), createTaskForm.getRequest().getHeads(), createTaskForm.getRequest().getBody());
+      bootstrapBuilder = HttpDownBootstrap.builder(requestForm.getMethod(), createTaskForm.getRequest().getUrl(), createTaskForm.getRequest().getHeads(), createTaskForm.getRequest().getBody());
     }
     //build a default taskInfo with WAIT status
     TaskInfo taskInfo = new TaskInfo()
@@ -80,6 +81,7 @@ public class TaskController {
         .downConfig(buildConfig(createTaskForm.getConfig()))
         .taskInfo(taskInfo)
         .callback(new PersistenceHttpDownCallback())
+        .proxyConfig(ConfigContent.getInstance().get().getProxyConfig())
         .build();
     HttpDownContent downContent = HttpDownContent.getInstance();
     String id = UUID.randomUUID().toString();
@@ -167,7 +169,7 @@ public class TaskController {
       bootstrap.pause();
       pauseFlag = true;
     }
-    bootstrap.setRequest(HttpDownUtil.buildGetRequest(requestForm.getUrl(), requestForm.getHeads(), requestForm.getBody()));
+    bootstrap.setRequest(HttpDownUtil.buildRequest(requestForm.getMethod(), requestForm.getUrl(), requestForm.getHeads(), requestForm.getBody()));
     HttpDownContent.getInstance().save();
     if (pauseFlag) {
       handleResume(Arrays.asList(id));
@@ -251,8 +253,10 @@ public class TaskController {
         .filter(id -> HttpDownContent.getInstance().get(id) != null)
         .map(id -> {
           TaskForm taskForm = new TaskForm();
+          HttpDownBootstrap httpDownBootstrap = HttpDownContent.getInstance().get(id);
           taskForm.setId(id);
-          taskForm.setInfo(HttpDownContent.getInstance().get(id).getTaskInfo());
+          taskForm.setInfo(httpDownBootstrap.getTaskInfo());
+          taskForm.setResponse(httpDownBootstrap.getResponse());
           return taskForm;
         })
         .collect(Collectors.toList());
