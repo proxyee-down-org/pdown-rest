@@ -1,6 +1,8 @@
 package org.pdown.rest.controller;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import org.pdown.core.boot.HttpDownBootstrap;
 import org.pdown.core.constant.HttpDownStatus;
@@ -10,6 +12,11 @@ import org.pdown.core.proxy.ProxyConfig;
 import org.pdown.rest.content.ConfigContent;
 import org.pdown.rest.content.HttpDownContent;
 import org.pdown.rest.entity.ServerConfigInfo;
+import org.pdown.rest.form.EventForm;
+import org.pdown.rest.form.TaskForm;
+import org.pdown.rest.vo.ResumeVo;
+import org.pdown.rest.websocket.TaskEvent;
+import org.pdown.rest.websocket.TaskEventHandler;
 
 public class PersistenceHttpDownCallback extends HttpDownCallback {
 
@@ -46,6 +53,13 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
   @Override
   public void onProgress(HttpDownBootstrap httpDownBootstrap) {
     HttpDownContent.getInstance().save(httpDownBootstrap);
+    String taskId = findTaskId(httpDownBootstrap);
+    if (taskId != null) {
+      TaskForm taskForm = new TaskForm();
+      taskForm.setId(findTaskId(httpDownBootstrap));
+      taskForm.setInfo(httpDownBootstrap.getTaskInfo());
+      TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.PROGRESS, taskForm));
+    }
   }
 
   @Override
@@ -62,7 +76,22 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
         .orElse(null);
     if (waitBootstrap != null) {
       waitBootstrap.resume();
+      ResumeVo resumeVo = new ResumeVo();
+      resumeVo.setResumeIds(Arrays.asList(findTaskId(waitBootstrap)));
+      TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
     }
+  }
+
+  private String findTaskId(HttpDownBootstrap httpDownBootstrap) {
+    Entry<String, HttpDownBootstrap> entry = HttpDownContent.getInstance().get().entrySet()
+        .stream()
+        .filter(e -> e.getValue() == httpDownBootstrap)
+        .findFirst()
+        .orElse(null);
+    if (entry == null) {
+      return null;
+    }
+    return entry.getKey();
   }
 
   private void commonConfig(HttpDownBootstrap httpDownBootstrap) {

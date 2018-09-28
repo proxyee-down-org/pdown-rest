@@ -32,10 +32,13 @@ import org.pdown.rest.content.HttpDownContent;
 import org.pdown.rest.entity.HttpResult;
 import org.pdown.rest.entity.ServerConfigInfo;
 import org.pdown.rest.form.CreateTaskForm;
+import org.pdown.rest.form.EventForm;
 import org.pdown.rest.form.HttpRequestForm;
 import org.pdown.rest.form.TaskForm;
 import org.pdown.rest.util.ContentUtil;
 import org.pdown.rest.vo.ResumeVo;
+import org.pdown.rest.websocket.TaskEventHandler;
+import org.pdown.rest.websocket.TaskEvent;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -114,6 +117,8 @@ public class TaskController {
     taskForm.setRequest(HttpRequestForm.parse(httpDownBootstrap.getRequest()));
     taskForm.setConfig(httpDownBootstrap.getDownConfig());
     taskForm.setInfo(httpDownBootstrap.getTaskInfo());
+    taskForm.setResponse(httpDownBootstrap.getResponse());
+    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.CREATE, taskForm));
     return ResponseEntity.ok(taskForm);
   }
 
@@ -129,19 +134,7 @@ public class TaskController {
             return Arrays.stream(statuses.split(",")).anyMatch(status -> status.equals(entry.getValue().getTaskInfo().getStatus() + ""));
           }
         })
-        .sorted((e1, e2) -> {
-          TaskInfo t1 = e1.getValue().getTaskInfo();
-          TaskInfo t2 = e2.getValue().getTaskInfo();
-          if (t1.getStatus() == HttpDownStatus.RUNNING
-              && t2.getStatus() != HttpDownStatus.RUNNING) {
-            return 1;
-          } else if (t2.getStatus() == HttpDownStatus.RUNNING
-              && t1.getStatus() != HttpDownStatus.RUNNING) {
-            return -1;
-          } else {
-            return (int) (t1.getStartTime() - t2.getStartTime());
-          }
-        })
+        .sorted((e1, e2) -> (int) (e2.getValue().getTaskInfo().getStartTime() - e1.getValue().getTaskInfo().getStartTime()))
         .map(entry -> TaskForm.parse(entry.getKey(), entry.getValue()))
         .collect(Collectors.toList());
     return ResponseEntity.ok(list);
@@ -172,7 +165,8 @@ public class TaskController {
     bootstrap.setRequest(HttpDownUtil.buildRequest(requestForm.getMethod(), requestForm.getUrl(), requestForm.getHeads(), requestForm.getBody()));
     HttpDownContent.getInstance().save();
     if (pauseFlag) {
-      handleResume(Arrays.asList(id));
+      ResumeVo resumeVo = handleResume(Arrays.asList(id));
+      TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
     }
     return ResponseEntity.ok(null);
   }
@@ -181,7 +175,8 @@ public class TaskController {
   public ResponseEntity delete(@PathVariable String ids, @RequestParam(required = false) boolean delFile)
       throws IOException {
     HttpDownContent httpDownContent = HttpDownContent.getInstance();
-    for (String id : ids.split(",")) {
+    String[] idArray = ids.split(",");
+    for (String id : idArray) {
       HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
       if (bootstrap == null) {
         continue;
@@ -198,6 +193,7 @@ public class TaskController {
       httpDownContent.remove(id);
     }
     httpDownContent.save();
+    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.DELETE, idArray));
     return ResponseEntity.ok(null);
   }
 
@@ -213,13 +209,15 @@ public class TaskController {
 
   @PutMapping("tasks/{ids}/pause")
   public ResponseEntity pauseDown(@PathVariable String ids) {
-    for (String id : ids.split(",")) {
+    String[] idArray = ids.split(",");
+    for (String id : idArray) {
       HttpDownBootstrap httpDownBootstrap = HttpDownContent.getInstance().get(id);
       if (httpDownBootstrap == null) {
         continue;
       }
       HttpDownContent.getInstance().get(id).pause();
     }
+    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.PAUSE, idArray));
     return ResponseEntity.ok(null);
   }
 
@@ -231,17 +229,22 @@ public class TaskController {
         .stream()
         .filter(httpDownBootstrap -> httpDownBootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
         .forEach(httpDownBootstrap -> httpDownBootstrap.pause());
+    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.PAUSE, new ArrayList<>()));
     return ResponseEntity.ok(null);
   }
 
   @PutMapping("tasks/{ids}/resume")
   public ResponseEntity resume(@PathVariable String ids) {
-    return ResponseEntity.ok(handleResume(Arrays.asList(ids.split(","))));
+    ResumeVo resumeVo = handleResume(Arrays.asList(ids.split(",")));
+    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
+    return ResponseEntity.ok(resumeVo);
   }
 
   @PutMapping("tasks/resume")
   public ResponseEntity resumeAll() {
-    return ResponseEntity.ok(handleResume(null));
+    ResumeVo resumeVo = handleResume(null);
+    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, null));
+    return ResponseEntity.ok(resumeVo);
   }
 
   @GetMapping("tasks/progress")
