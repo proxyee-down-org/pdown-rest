@@ -3,6 +3,9 @@ package org.pdown.rest.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.util.internal.StringUtil;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -56,7 +59,7 @@ public class TaskController {
   Create a download task
    */
   @PostMapping("tasks")
-  public ResponseEntity create(HttpServletRequest request) throws Exception {
+  public ResponseEntity create(HttpServletRequest request, @RequestParam(name = "refresh", required = false) boolean refresh) throws Exception {
     ObjectMapper mapper = new ObjectMapper();
     CreateTaskForm createTaskForm = mapper.readValue(request.getInputStream(), CreateTaskForm.class);
     if (createTaskForm.getRequest() == null) {
@@ -105,6 +108,22 @@ public class TaskController {
           } else if (e instanceof BootstrapNoSpaceException) {
             throw new ParameterException(4006, "No space");
           } else if (e instanceof BootstrapFileAlreadyExistsException) {
+            if (refresh) {
+              //find same task
+              Entry<String, HttpDownBootstrap> sameEntry = downContent.get().entrySet().stream()
+                  .filter(entry -> {
+                    HttpDownBootstrap bootstrap = entry.getValue();
+                    Path newTaskPath = Paths.get(createTaskForm.getConfig().getFilePath(), createTaskForm.getResponse().getFileName());
+                    Path oldTaskPath = Paths.get(bootstrap.getDownConfig().getFilePath(), bootstrap.getResponse().getFileName());
+                    return newTaskPath.equals(oldTaskPath);
+                  })
+                  .findFirst()
+                  .orElse(null);
+              //refresh task
+              if (sameEntry != null) {
+                return refreshCommon(sameEntry.getKey(), createTaskForm.getRequest());
+              }
+            }
             throw new ParameterException(4007, "File already exists");
           }
         }
@@ -151,9 +170,13 @@ public class TaskController {
 
   @PutMapping("tasks/{id}")
   public ResponseEntity refresh(@PathVariable String id, HttpServletRequest request) throws IOException {
-    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
     ObjectMapper mapper = new ObjectMapper();
     HttpRequestForm requestForm = mapper.readValue(request.getInputStream(), HttpRequestForm.class);
+    return refreshCommon(id, requestForm);
+  }
+
+  private ResponseEntity refreshCommon(String id, HttpRequestForm requestForm) throws MalformedURLException {
+    HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
     if (bootstrap == null) {
       throw new NotFoundException("task does not exist");
     }
