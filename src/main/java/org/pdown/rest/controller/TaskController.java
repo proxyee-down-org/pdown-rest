@@ -40,8 +40,8 @@ import org.pdown.rest.form.HttpRequestForm;
 import org.pdown.rest.form.TaskForm;
 import org.pdown.rest.util.ContentUtil;
 import org.pdown.rest.vo.ResumeVo;
-import org.pdown.rest.websocket.TaskEventHandler;
 import org.pdown.rest.websocket.TaskEvent;
+import org.pdown.rest.websocket.TaskEventHandler;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -49,6 +49,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -197,8 +199,38 @@ public class TaskController {
   @DeleteMapping("tasks/{ids}")
   public ResponseEntity delete(@PathVariable String ids, @RequestParam(required = false) boolean delFile)
       throws IOException {
-    HttpDownContent httpDownContent = HttpDownContent.getInstance();
     String[] idArray = ids.split(",");
+    commonDelete(Arrays.asList(idArray), delFile);
+    return ResponseEntity.ok(null);
+  }
+
+  /*
+  ID比较多时HTTP DELETE不支持请求体，url过长会报错
+  所以这里提供一个HTTP POST 接口进行删除
+   */
+  @PostMapping("tasks/delete")
+  public ResponseEntity deleteLog(HttpServletRequest request, @RequestParam(required = false) boolean delFile) throws IOException {
+    ObjectMapper mapper = new ObjectMapper();
+    List<String> ids = request.getContentLength() > 0 ?
+        mapper.readValue(request.getInputStream(), ArrayList.class) : new ArrayList<>();
+    if (ids.size() > 0) {
+      commonDelete(ids, delFile);
+    }
+    return ResponseEntity.ok(null);
+  }
+
+  @DeleteMapping("tasks")
+  public ResponseEntity delete(@RequestParam(required = false) boolean delFile) throws IOException {
+    List<String> ids = HttpDownContent.getInstance().get().keySet().stream().collect(Collectors.toList());
+    if (ids.size() > 0) {
+      commonDelete(ids, delFile);
+    }
+    return ResponseEntity.ok(null);
+  }
+
+
+  private void commonDelete(List<String> idArray, boolean delFile) throws IOException {
+    HttpDownContent httpDownContent = HttpDownContent.getInstance();
     for (String id : idArray) {
       HttpDownBootstrap bootstrap = HttpDownContent.getInstance().get(id);
       if (bootstrap == null) {
@@ -217,17 +249,6 @@ public class TaskController {
     }
     httpDownContent.save();
     TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.DELETE, idArray));
-    return ResponseEntity.ok(null);
-  }
-
-  @DeleteMapping("tasks")
-  public ResponseEntity delete(@RequestParam(required = false) boolean delFile)
-      throws IOException {
-    Set<Entry<String, HttpDownBootstrap>> bootstraps = HttpDownContent.getInstance().get().entrySet();
-    for (Entry<String, HttpDownBootstrap> entry : bootstraps) {
-      delete(entry.getKey(), delFile);
-    }
-    return ResponseEntity.ok(null);
   }
 
   @PutMapping("tasks/{ids}/pause")
@@ -240,33 +261,56 @@ public class TaskController {
       }
       HttpDownContent.getInstance().get(id).pause();
     }
+    PersistenceHttpDownCallback.calcSpeedLimit();
+    HttpDownContent.getInstance().save();
     TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.PAUSE, idArray));
     return ResponseEntity.ok(null);
   }
 
   @PutMapping("tasks/pause")
-  public ResponseEntity<HttpResult> pauseAll() {
+  public ResponseEntity<HttpResult> pauseAll(HttpServletRequest request) throws IOException {
+    ObjectMapper mapper = new ObjectMapper();
+    List<String> ids = request.getContentLength() > 0 ?
+        mapper.readValue(request.getInputStream(), ArrayList.class) : new ArrayList<>();
     HttpDownContent.getInstance()
         .get()
-        .values()
+        .entrySet()
         .stream()
-        .filter(httpDownBootstrap -> httpDownBootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
-        .forEach(httpDownBootstrap -> httpDownBootstrap.pause());
-    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.PAUSE, new ArrayList<>()));
+        .filter(entry -> {
+          TaskInfo taskInfo = entry.getValue().getTaskInfo();
+          if (taskInfo.getStatus() == HttpDownStatus.RUNNING
+              || taskInfo.getStatus() == HttpDownStatus.WAIT) {
+            if (ids.size() == 0 || ids.contains(entry.getKey())) {
+              return true;
+            }
+          }
+          return false;
+        })
+        .forEach(entry -> entry.getValue().pause());
+    PersistenceHttpDownCallback.calcSpeedLimit();
+    HttpDownContent.getInstance().save();
+    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.PAUSE, ids));
     return ResponseEntity.ok(null);
   }
 
   @PutMapping("tasks/{ids}/resume")
   public ResponseEntity resume(@PathVariable String ids) {
     ResumeVo resumeVo = handleResume(Arrays.asList(ids.split(",")));
+    PersistenceHttpDownCallback.calcSpeedLimit();
+    HttpDownContent.getInstance().save();
     TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
     return ResponseEntity.ok(resumeVo);
   }
 
   @PutMapping("tasks/resume")
-  public ResponseEntity resumeAll() {
-    ResumeVo resumeVo = handleResume(null);
-    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, null));
+  public ResponseEntity resumeAll(HttpServletRequest request) throws IOException {
+    ObjectMapper mapper = new ObjectMapper();
+    List<String> ids = request.getContentLength() > 0 ?
+        mapper.readValue(request.getInputStream(), ArrayList.class) : new ArrayList<>();
+    ResumeVo resumeVo = handleResume(ids);
+    PersistenceHttpDownCallback.calcSpeedLimit();
+    HttpDownContent.getInstance().save();
+    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
     return ResponseEntity.ok(resumeVo);
   }
 
@@ -290,7 +334,6 @@ public class TaskController {
   }
 
   //Pause running task
-
   private ResumeVo handleResume(List<String> resumeIds) {
     ResumeVo resumeVo = new ResumeVo();
     List<Entry<String, HttpDownBootstrap>> runList = new ArrayList<>();
@@ -307,37 +350,59 @@ public class TaskController {
 
     List<String> needResumeIds = new ArrayList<>();
     List<String> needPauseIds = new ArrayList<>();
+    List<String> needWaitIds = new ArrayList<>();
     int taskLimit = ConfigContent.getInstance().get().getTaskLimit();
+    //没有指定继续下载的任务ID，则继续所有的下载任务
     if (resumeIds == null || resumeIds.size() == 0) {
       int needResumeCount = taskLimit - runList.size();
-      if (needResumeCount > 0) {
-        needResumeIds = waitList.stream()
-            .limit(needResumeCount)
-            .map(entry -> entry.getKey())
-            .collect(Collectors.toList());
+      //计算出要继续下载的任务ID和待下载的任务ID
+      for (int i = 0; i < waitList.size(); i++) {
+        Entry<String, HttpDownBootstrap> entry = waitList.get(i);
+        if (i < needResumeCount) {
+          needResumeIds.add(entry.getKey());
+        } else {
+          needWaitIds.add(entry.getKey());
+        }
       }
     } else {
-      needResumeIds = resumeIds.stream()
-          .filter(id -> waitList.stream().anyMatch(entry -> id.equals(entry.getKey())))
-          .limit(taskLimit)
-          .collect(Collectors.toList());
+      for (int i = 0, j = 0; i < waitList.size(); i++) {
+        Entry<String, HttpDownBootstrap> entry = waitList.get(i);
+        if (resumeIds.contains(entry.getKey())) {
+          if (j < taskLimit) {
+            needResumeIds.add(entry.getKey());
+            j++;
+          } else {
+            needWaitIds.add(entry.getKey());
+          }
+        }
+      }
     }
     resumeVo.setResumeIds(needResumeIds);
     resumeVo.setPauseIds(needPauseIds);
+    resumeVo.setWaitIds(needWaitIds);
     if (needResumeIds.size() > 0) {
+      //计算需要被暂停的任务个数
       int needPauseCount = runList.size() + needResumeIds.size() - taskLimit;
       if (needPauseCount > 0) {
+        //暂停正在运行的任务,状态更新成待下载
         for (int i = 0; i < needPauseCount; i++) {
           Entry<String, HttpDownBootstrap> entry = runList.get(i);
           needPauseIds.add(entry.getKey());
           entry.getValue().pause();
+          needWaitIds.add(entry.getKey());
         }
       }
+      //开始指定要继续下载的任务
       for (Entry<String, HttpDownBootstrap> entry : waitList) {
         if (needResumeIds.contains(entry.getKey())) {
           entry.getValue().resume();
         }
       }
+    }
+    if (needWaitIds.size() > 0) {
+      waitList.stream()
+          .filter(entry -> needWaitIds.contains(entry.getKey()))
+          .forEach(entry -> entry.getValue().getTaskInfo().setStatus(HttpDownStatus.WAIT));
     }
     return resumeVo;
   }

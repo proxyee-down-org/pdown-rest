@@ -1,13 +1,11 @@
 package org.pdown.rest.controller;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import org.pdown.core.boot.HttpDownBootstrap;
 import org.pdown.core.constant.HttpDownStatus;
 import org.pdown.core.dispatch.HttpDownCallback;
-import org.pdown.core.entity.ChunkInfo;
 import org.pdown.core.proxy.ProxyConfig;
 import org.pdown.rest.content.ConfigContent;
 import org.pdown.rest.content.HttpDownContent;
@@ -27,26 +25,13 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
   }
 
   @Override
-  public void onPause(HttpDownBootstrap httpDownBootstrap) {
-    calcSpeedLimit();
-    HttpDownContent.getInstance().save();
-  }
-
-  @Override
   public void onResume(HttpDownBootstrap httpDownBootstrap) {
     commonConfig(httpDownBootstrap);
-    calcSpeedLimit();
-    HttpDownContent.getInstance().save();
   }
 
   @Override
   public void onError(HttpDownBootstrap httpDownBootstrap) {
     calcSpeedLimit();
-    HttpDownContent.getInstance().save();
-  }
-
-  @Override
-  public void onChunkDone(HttpDownBootstrap httpDownBootstrap, ChunkInfo chunkInfo) {
     HttpDownContent.getInstance().save();
   }
 
@@ -68,17 +53,22 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
     HttpDownContent.getInstance().save();
     //删除进度记录文件
     HttpDownContent.getInstance().remove(httpDownBootstrap);
-    //开始一个待下载的任务
-    HttpDownBootstrap waitBootstrap = HttpDownContent.getInstance().get().values()
-        .stream()
-        .filter(bootstrap -> bootstrap.getTaskInfo().getStatus() == HttpDownStatus.WAIT)
-        .findFirst()
-        .orElse(null);
-    if (waitBootstrap != null) {
-      waitBootstrap.resume();
-      ResumeVo resumeVo = new ResumeVo();
-      resumeVo.setResumeIds(Arrays.asList(findTaskId(waitBootstrap)));
-      TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
+    //开始待下载的任务
+    int taskLimit = ConfigContent.getInstance().get().getTaskLimit();
+    int runSize = (int) HttpDownContent.getInstance().get().values().stream().filter(bootstrap -> bootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING).count();
+    int resumeSize = taskLimit - runSize;
+    if (resumeSize > 0) {
+      List<Entry<String, HttpDownBootstrap>> resumeList = HttpDownContent.getInstance().get().entrySet()
+          .stream()
+          .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.WAIT)
+          .limit(resumeSize)
+          .collect(Collectors.toList());
+      if (resumeList != null && resumeList.size() > 0) {
+        resumeList.forEach(entry -> entry.getValue().resume());
+        ResumeVo resumeVo = new ResumeVo();
+        resumeVo.setResumeIds(resumeList.stream().map(entry -> entry.getKey()).collect(Collectors.toList()));
+        TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
+      }
     }
   }
 

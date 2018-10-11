@@ -5,6 +5,7 @@ import java.util.List;
 public class ResumeVo {
   private List<String> pauseIds;
   private List<String> resumeIds;
+  private List<String> waitIds;
 
   public List<String> getPauseIds() {
     return pauseIds;
@@ -21,6 +22,15 @@ public class ResumeVo {
 
   public ResumeVo setResumeIds(List<String> resumeIds) {
     this.resumeIds = resumeIds;
+    return this;
+  }
+
+  public List<String> getWaitIds() {
+    return waitIds;
+  }
+
+  public ResumeVo setWaitIds(List<String> waitIds) {
+    this.waitIds = waitIds;
     return this;
   }
 }

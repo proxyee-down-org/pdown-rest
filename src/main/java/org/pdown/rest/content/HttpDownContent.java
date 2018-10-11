@@ -97,7 +97,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
                 FileUtil.deleteIfExists(progressPath);
                 FileUtil.deleteIfExists(ContentUtil.buildBakPath(progressPath));
               } else if (taskInfo.getStatus() != HttpDownStatus.PAUSE) {
-                taskInfo.setStatus(HttpDownStatus.PAUSE);
+                taskInfo.setStatus(HttpDownStatus.WAIT);
                 //暂停时间计算
                 taskInfo.setLastPauseTime(System.currentTimeMillis());
                 for (ChunkInfo chunkInfo : taskInfo.getChunkInfoList()) {
