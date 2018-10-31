@@ -35,12 +35,12 @@ public class ConfigController {
           || beforeConfig.getTotalSpeedLimit() != serverConfigInfo.getTotalSpeedLimit();
       BeanUtils.copyProperties(serverConfigInfo, ConfigContent.getInstance().get());
       if (speedChange) {
-        PersistenceHttpDownCallback.calcSpeedLimit();
+        HttpDownRestCallback.calcSpeedLimit();
       }
     }
     HttpDownContent.getInstance().get().values().stream()
-        .filter(bootstrap -> bootstrap.getTaskInfo().getStatus() != HttpDownStatus.DONE)
-        .forEach(bootstrap -> bootstrap.setProxyConfig(serverConfigInfo.getProxyConfig()));
+        .filter(downInfo -> downInfo.getBootstrap().getTaskInfo().getStatus() != HttpDownStatus.DONE)
+        .forEach(downInfo -> downInfo.getBootstrap().setProxyConfig(serverConfigInfo.getProxyConfig()));
     ConfigContent.getInstance().save();
     return ResponseEntity.ok(null);
   }

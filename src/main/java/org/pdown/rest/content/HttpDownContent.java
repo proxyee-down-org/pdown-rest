@@ -17,12 +17,13 @@ import org.pdown.core.entity.TaskInfo;
 import org.pdown.core.util.FileUtil;
 import org.pdown.core.util.HttpDownUtil;
 import org.pdown.rest.base.content.PersistenceContent;
-import org.pdown.rest.controller.PersistenceHttpDownCallback;
+import org.pdown.rest.controller.HttpDownRestCallback;
+import org.pdown.rest.entity.DownInfo;
 import org.pdown.rest.entity.ServerConfigInfo;
 import org.pdown.rest.form.TaskForm;
 import org.pdown.rest.util.ContentUtil;
 
-public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBootstrap>, HttpDownContent> {
+public class HttpDownContent extends PersistenceContent<Map<String, DownInfo>, HttpDownContent> {
 
   private static final HttpDownContent INSTANCE = new HttpDownContent();
 
@@ -47,16 +48,16 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
   }
 
   @Override
-  protected Map<String, HttpDownBootstrap> defaultValue() {
+  protected Map<String, DownInfo> defaultValue() {
     return new LinkedHashMap<>();
   }
 
-  public HttpDownContent put(String id, HttpDownBootstrap httpDownBootstrap) {
-    content.put(id, httpDownBootstrap);
+  public HttpDownContent put(String id, DownInfo downInfo) {
+    content.put(id, downInfo);
     return this;
   }
 
-  public HttpDownBootstrap get(String id) {
+  public DownInfo get(String id) {
     return content.get(id);
   }
 
@@ -97,7 +98,11 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
                 FileUtil.deleteIfExists(progressPath);
                 FileUtil.deleteIfExists(ContentUtil.buildBakPath(progressPath));
               } else if (taskInfo.getStatus() != HttpDownStatus.PAUSE) {
-                taskInfo.setStatus(HttpDownStatus.WAIT);
+                if (taskInfo.getStatus() == HttpDownStatus.ERROR) {
+                  taskInfo.setStatus(HttpDownStatus.ERROR);
+                } else {
+                  taskInfo.setStatus(HttpDownStatus.WAIT);
+                }
                 //暂停时间计算
                 taskInfo.setLastPauseTime(System.currentTimeMillis());
                 for (ChunkInfo chunkInfo : taskInfo.getChunkInfoList()) {
@@ -111,9 +116,10 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
               .response(taskForm.getResponse())
               .downConfig(taskForm.getConfig())
               .taskInfo(taskInfo)
-              .callback(new PersistenceHttpDownCallback())
+              .callback(HttpDownRestCallback.getCallback())
               .build();
-          content.put(taskForm.getId(), httpDownBootstrap);
+          DownInfo downInfo = new DownInfo(taskForm.getId(), httpDownBootstrap, taskForm.getData());
+          content.put(taskForm.getId(), downInfo);
         }
       }
     } catch (Exception e) {
@@ -129,7 +135,7 @@ public class HttpDownContent extends PersistenceContent<Map<String, HttpDownBoot
   public HttpDownContent save() {
     if (content != null) {
       List<TaskForm> taskForms = content.entrySet().stream()
-          .map(entry -> TaskForm.parse(entry.getKey(), entry.getValue()))
+          .map(entry -> TaskForm.parse(entry.getValue()))
           .collect(Collectors.toList());
       try {
         synchronized (content) {

@@ -5,5 +5,6 @@ public enum TaskEvent {
   PROGRESS,
   PAUSE,
   RESUME,
+  ERROR,
   DELETE
 }

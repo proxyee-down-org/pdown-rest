@@ -1,7 +1,6 @@
 package org.pdown.rest.controller;
 
 import java.util.List;
-import java.util.Map.Entry;
 import java.util.stream.Collectors;
 import org.pdown.core.boot.HttpDownBootstrap;
 import org.pdown.core.constant.HttpDownStatus;
@@ -9,6 +8,7 @@ import org.pdown.core.dispatch.HttpDownCallback;
 import org.pdown.core.proxy.ProxyConfig;
 import org.pdown.rest.content.ConfigContent;
 import org.pdown.rest.content.HttpDownContent;
+import org.pdown.rest.entity.DownInfo;
 import org.pdown.rest.entity.ServerConfigInfo;
 import org.pdown.rest.form.EventForm;
 import org.pdown.rest.form.TaskForm;
@@ -16,7 +16,22 @@ import org.pdown.rest.vo.ResumeVo;
 import org.pdown.rest.websocket.TaskEvent;
 import org.pdown.rest.websocket.TaskEventHandler;
 
-public class PersistenceHttpDownCallback extends HttpDownCallback {
+public class HttpDownRestCallback extends HttpDownCallback {
+
+  private static HttpDownRestCallback callback;
+
+  public synchronized static HttpDownRestCallback getCallback() {
+    if (callback == null) {
+      callback = new HttpDownRestCallback();
+    }
+    return callback;
+  }
+
+  public synchronized static void setCallback(HttpDownRestCallback callback) {
+    if (HttpDownRestCallback.callback == null) {
+      HttpDownRestCallback.callback = callback;
+    }
+  }
 
   @Override
   public void onStart(HttpDownBootstrap httpDownBootstrap) {
@@ -33,6 +48,14 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
   public void onError(HttpDownBootstrap httpDownBootstrap) {
     calcSpeedLimit();
     HttpDownContent.getInstance().save();
+    HttpDownContent.getInstance().save(httpDownBootstrap);
+    String taskId = findTaskId(httpDownBootstrap);
+    if (taskId != null) {
+      TaskForm taskForm = new TaskForm();
+      taskForm.setId(taskId);
+      taskForm.setInfo(httpDownBootstrap.getTaskInfo());
+      TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.ERROR, taskForm));
+    }
   }
 
   @Override
@@ -41,7 +64,7 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
     String taskId = findTaskId(httpDownBootstrap);
     if (taskId != null) {
       TaskForm taskForm = new TaskForm();
-      taskForm.setId(findTaskId(httpDownBootstrap));
+      taskForm.setId(taskId);
       taskForm.setInfo(httpDownBootstrap.getTaskInfo());
       TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.PROGRESS, taskForm));
     }
@@ -55,33 +78,43 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
     HttpDownContent.getInstance().remove(httpDownBootstrap);
     //开始待下载的任务
     int taskLimit = ConfigContent.getInstance().get().getTaskLimit();
-    int runSize = (int) HttpDownContent.getInstance().get().values().stream().filter(bootstrap -> bootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING).count();
+    int runSize = (int) HttpDownContent.getInstance().get().values().stream()
+        .filter(downInfo -> downInfo.getBootstrap().getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
+        .count();
     int resumeSize = taskLimit - runSize;
     if (resumeSize > 0) {
-      List<Entry<String, HttpDownBootstrap>> resumeList = HttpDownContent.getInstance().get().entrySet()
+      List<DownInfo> resumeList = HttpDownContent.getInstance().get().values()
           .stream()
-          .filter(entry -> entry.getValue().getTaskInfo().getStatus() == HttpDownStatus.WAIT)
+          .filter(downInfo -> downInfo.getBootstrap().getTaskInfo().getStatus() == HttpDownStatus.WAIT)
           .limit(resumeSize)
           .collect(Collectors.toList());
       if (resumeList != null && resumeList.size() > 0) {
-        resumeList.forEach(entry -> entry.getValue().resume());
+        resumeList.forEach(downInfo -> downInfo.getBootstrap().resume());
         ResumeVo resumeVo = new ResumeVo();
-        resumeVo.setResumeIds(resumeList.stream().map(entry -> entry.getKey()).collect(Collectors.toList()));
+        resumeVo.setResumeIds(resumeList.stream().map(downInfo -> downInfo.getId()).collect(Collectors.toList()));
         TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
       }
     }
   }
 
-  private String findTaskId(HttpDownBootstrap httpDownBootstrap) {
-    Entry<String, HttpDownBootstrap> entry = HttpDownContent.getInstance().get().entrySet()
+  protected String findTaskId(HttpDownBootstrap httpDownBootstrap) {
+    DownInfo sameDown = HttpDownContent.getInstance().get().values()
         .stream()
-        .filter(e -> e.getValue() == httpDownBootstrap)
+        .filter(downInfo -> downInfo.getBootstrap() == httpDownBootstrap)
         .findFirst()
         .orElse(null);
-    if (entry == null) {
+    if (sameDown == null) {
       return null;
     }
-    return entry.getKey();
+    return sameDown.getId();
+  }
+
+  protected DownInfo findDownInfo(HttpDownBootstrap httpDownBootstrap) {
+    String taskId = findTaskId(httpDownBootstrap);
+    if (taskId == null) {
+      return null;
+    }
+    return HttpDownContent.getInstance().get(taskId);
   }
 
   private void commonConfig(HttpDownBootstrap httpDownBootstrap) {
@@ -100,26 +133,26 @@ public class PersistenceHttpDownCallback extends HttpDownCallback {
     ServerConfigInfo serverConfigInfo = ConfigContent.getInstance().get();
     long totalSpeedLimit = serverConfigInfo.getTotalSpeedLimit();
     long speedLimit = serverConfigInfo.getSpeedLimit();
-    List<HttpDownBootstrap> runList = HttpDownContent.getInstance().get()
+    List<DownInfo> runList = HttpDownContent.getInstance().get()
         .values()
         .stream()
-        .filter(bootstrap -> HttpDownStatus.RUNNING == bootstrap.getTaskInfo().getStatus())
+        .filter(downInfo -> HttpDownStatus.RUNNING == downInfo.getBootstrap().getTaskInfo().getStatus())
         .collect(Collectors.toList());
     if (runList.size() > 0) {
       if (totalSpeedLimit > 0) {
         long avgSpeedLimit = (long) (totalSpeedLimit / (double) runList.size());
-        for (HttpDownBootstrap bootstrap : runList) {
-          bootstrap.getDownConfig().setSpeedLimit(avgSpeedLimit);
-          refreshLast(bootstrap);
+        for (DownInfo downInfo : runList) {
+          downInfo.getBootstrap().getDownConfig().setSpeedLimit(avgSpeedLimit);
+          refreshLast(downInfo.getBootstrap());
         }
       } else if (speedLimit > 0) {
-        for (HttpDownBootstrap bootstrap : runList) {
-          bootstrap.getDownConfig().setSpeedLimit(speedLimit);
-          refreshLast(bootstrap);
+        for (DownInfo downInfo : runList) {
+          downInfo.getBootstrap().getDownConfig().setSpeedLimit(speedLimit);
+          refreshLast(downInfo.getBootstrap());
         }
       } else {
-        for (HttpDownBootstrap bootstrap : runList) {
-          bootstrap.getDownConfig().setSpeedLimit(0);
+        for (DownInfo downInfo : runList) {
+          downInfo.getBootstrap().getDownConfig().setSpeedLimit(0);
         }
       }
     }
