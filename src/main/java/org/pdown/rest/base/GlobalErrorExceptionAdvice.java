@@ -30,6 +30,7 @@ public class GlobalErrorExceptionAdvice {
   @ExceptionHandler(JsonProcessingException.class)
   @ResponseBody
   public ResponseEntity<HttpResult> handleJsonParseError(HttpServletResponse response, Exception e) {
+    LOGGER.error("parameters parse error", e);
     return ResponseEntity.badRequest().body(new HttpResult()
         .code(4000)
         .msg("parameters parse error"));

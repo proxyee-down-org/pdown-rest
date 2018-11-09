@@ -90,53 +90,57 @@ public class TaskController {
         .build();
     HttpDownContent downContent = HttpDownContent.getInstance();
     String id = UUID.randomUUID().toString();
+    boolean startFlag = false;
     synchronized (downContent) {
+      if (refresh) {
+        //find same task
+        DownInfo sameDown = downContent.get().values().stream()
+            .filter(downInfo -> {
+              if (downInfo.getBootstrap().getTaskInfo().getStatus() != HttpDownStatus.DONE) {
+                HttpDownBootstrap bootstrap = downInfo.getBootstrap();
+                Path newTaskPath = Paths.get(httpDownBootstrap.getDownConfig().getFilePath(), httpDownBootstrap.getResponse().getFileName());
+                Path oldTaskPath = Paths.get(bootstrap.getDownConfig().getFilePath(), bootstrap.getResponse().getFileName());
+                return newTaskPath.equals(oldTaskPath);
+              }
+              return false;
+            })
+            .findFirst()
+            .orElse(null);
+        //refresh task
+        if (sameDown != null) {
+          refreshCommon(sameDown.getId(), createTaskForm.getRequest(), false);
+          TaskForm taskForm = TaskForm.parse(sameDown);
+          return ResponseEntity.ok(taskForm);
+        }
+      }
       long runningCount = downContent.get().values().stream()
-          .filter(downInfo -> downInfo.getBootstrap().getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
+          .filter(d -> d.getBootstrap().getTaskInfo().getStatus() == HttpDownStatus.RUNNING)
           .count();
       if (runningCount < ConfigContent.getInstance().get().getTaskLimit()) {
-        try {
-          httpDownBootstrap.start();
-        } catch (BootstrapException e) {
-          if (e instanceof BootstrapPathEmptyException) {
-            throw new ParameterException(4003, "Save path is empty");
-          } else if (e instanceof BootstrapCreateDirException) {
-            throw new ParameterException(4004, "Can't create dir");
-          } else if (e instanceof BootstrapNoPermissionException) {
-            throw new ParameterException(4005, "No permission");
-          } else if (e instanceof BootstrapNoSpaceException) {
-            throw new ParameterException(4006, "No space");
-          } else if (e instanceof BootstrapFileAlreadyExistsException) {
-            if (refresh) {
-              //find same task
-              DownInfo sameDown = downContent.get().values().stream()
-                  .filter(downInfo -> {
-                    HttpDownBootstrap bootstrap = downInfo.getBootstrap();
-                    Path newTaskPath = Paths.get(createTaskForm.getConfig().getFilePath(), createTaskForm.getResponse().getFileName());
-                    Path oldTaskPath = Paths.get(bootstrap.getDownConfig().getFilePath(), bootstrap.getResponse().getFileName());
-                    return newTaskPath.equals(oldTaskPath);
-                  })
-                  .findFirst()
-                  .orElse(null);
-              //refresh task
-              if (sameDown != null) {
-                return refreshCommon(sameDown.getId(), createTaskForm.getRequest());
-              }
-            }
-            throw new ParameterException(4007, "File already exists");
-          }
-        }
+        startFlag = true;
       }
     }
     DownInfo downInfo = new DownInfo(id, httpDownBootstrap, createTaskForm.getData());
     downContent.put(id, downInfo).save();
+    if (startFlag) {
+      try {
+        httpDownBootstrap.start();
+      } catch (BootstrapException e) {
+        if (e instanceof BootstrapPathEmptyException) {
+          throw new ParameterException(4003, "Save path is empty");
+        } else if (e instanceof BootstrapCreateDirException) {
+          throw new ParameterException(4004, "Can't create dir");
+        } else if (e instanceof BootstrapNoPermissionException) {
+          throw new ParameterException(4005, "No permission");
+        } else if (e instanceof BootstrapNoSpaceException) {
+          throw new ParameterException(4006, "No space");
+        } else if (e instanceof BootstrapFileAlreadyExistsException) {
+          throw new ParameterException(4007, "File already exists");
+        }
+      }
+    }
     HttpDownRestCallback.calcSpeedLimit();
-    TaskForm taskForm = new TaskForm();
-    taskForm.setId(id);
-    taskForm.setRequest(HttpRequestForm.parse(httpDownBootstrap.getRequest()));
-    taskForm.setConfig(httpDownBootstrap.getDownConfig());
-    taskForm.setInfo(httpDownBootstrap.getTaskInfo());
-    taskForm.setResponse(httpDownBootstrap.getResponse());
+    TaskForm taskForm = TaskForm.parse(downInfo);
     TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.CREATE, taskForm));
     return ResponseEntity.ok(taskForm);
   }
@@ -172,22 +176,27 @@ public class TaskController {
   public ResponseEntity refresh(@PathVariable String id, HttpServletRequest request) throws IOException {
     ObjectMapper mapper = new ObjectMapper();
     HttpRequestForm requestForm = mapper.readValue(request.getInputStream(), HttpRequestForm.class);
-    return refreshCommon(id, requestForm);
+    return refreshCommon(id, requestForm, true);
   }
 
-  private ResponseEntity refreshCommon(String id, HttpRequestForm requestForm) throws MalformedURLException {
+  private ResponseEntity refreshCommon(String id, HttpRequestForm requestForm, boolean needResume) throws MalformedURLException {
     DownInfo downInfo = HttpDownContent.getInstance().get(id);
     if (downInfo == null) {
       throw new NotFoundException("task does not exist");
     }
     HttpDownBootstrap bootstrap = downInfo.getBootstrap();
+    boolean isRun = false;
     if (bootstrap.getTaskInfo().getStatus() == HttpDownStatus.RUNNING) {
+      isRun = true;
       bootstrap.pause();
     }
     bootstrap.setRequest(HttpDownUtil.buildRequest(requestForm.getMethod(), requestForm.getUrl(), requestForm.getHeads(), requestForm.getBody()));
     HttpDownContent.getInstance().save();
-    ResumeVo resumeVo = handleResume(Arrays.asList(id));
-    TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
+    //刷新正在运行中的任务或者一定要开始的任务，则调用任务恢复方法
+    if (isRun || needResume) {
+      ResumeVo resumeVo = handleResume(Arrays.asList(id));
+      TaskEventHandler.dispatchEvent(new EventForm(TaskEvent.RESUME, resumeVo));
+    }
     return ResponseEntity.ok(null);
   }
 

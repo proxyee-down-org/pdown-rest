@@ -74,4 +74,14 @@ public class HttpRequestForm {
     }
     return form;
   }
+
+  @Override
+  public String toString() {
+    return "HttpRequestForm{" +
+        "method='" + method + '\'' +
+        ", url='" + url + '\'' +
+        ", heads=" + heads +
+        ", body='" + body + '\'' +
+        '}';
+  }
 }
